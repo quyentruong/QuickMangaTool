@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Linq;
 
 /// <summary>
 /// Determines whether a CBZ archive contains images that need upscaling or quality improvement.
@@ -67,12 +68,17 @@ class UpscaleDetector : IUpscaleDetector
                 .Where(e => Path.GetExtension(e.Name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".webp")
                 .ToList();
 
-            // Cover pages and title spreads (indices 0–9) often differ in size, style, or
-            // compression from content pages. Skip them when the archive is large enough so
-            // that detection is driven by representative interior pages.
-            var entriesToCheck = imageEntries.Count > 10
-                ? imageEntries.Skip(10)
-                : imageEntries;
+            // Check the 5 smallest and 5 largest image files by uncompressed size to
+            // reduce work while sampling both ends of the distribution. Ensure the
+            // combined list is unique (small archives may have fewer than 10 images).
+            var smallest = imageEntries.OrderBy(e => e.Length).Take(5);
+            var largest = imageEntries.OrderByDescending(e => e.Length).Take(5);
+            var entriesToCheck = smallest.Concat(largest)
+                .GroupBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            var issues = new List<UpscaleIssue>();
 
             foreach (var entry in entriesToCheck)
             {
@@ -101,11 +107,10 @@ class UpscaleDetector : IUpscaleDetector
                     var reasons = GetFailingChecks(metrics.Value);
                     if (reasons.Count > 0)
                     {
-                        // Pages in a CBZ almost always originate from the same scan source,
-                        // so a single failing image is sufficient evidence. Exit immediately
-                        // to avoid decoding every page unnecessarily.
-                        var issue = new UpscaleIssue(entry.Name, reasons);
-                        return new UpscaleScanResult(true, [issue]);
+                        var issue = new UpscaleIssue(entry.Name, entry.Length, reasons);
+                        issues.Add(issue);
+                        // Continue checking the remaining selected images rather than
+                        // returning immediately so we can report all detected issues.
                     }
                 }
                 catch
@@ -113,6 +118,9 @@ class UpscaleDetector : IUpscaleDetector
                     // Ignore corrupt or unreadable entries; continue scanning the archive.
                 }
             }
+
+            if (issues.Count > 0)
+                return new UpscaleScanResult(true, issues.ToArray());
 
             return UpscaleScanResult.Clean;
         }

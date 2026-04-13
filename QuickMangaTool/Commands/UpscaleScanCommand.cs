@@ -28,8 +28,15 @@ class UpscaleScanCommand : IAppCommand
             {
                 try
                 {
-                    var r = _detector.Scan(cbz);
-                    results.Add((cbz, r, null));
+                    if (SkipCache.ShouldSkip(cbz))
+                    {
+                        results.Add((cbz, UpscaleScanResult.Clean, null));
+                    }
+                    else
+                    {
+                        var r = _detector.Scan(cbz);
+                        results.Add((cbz, r, null));
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -72,6 +79,9 @@ class UpscaleScanCommand : IAppCommand
                 if (needsUpscale) needs++;
 
                 logger.WriteEntry(pr);
+                // If the scan determined there was no upscale needed, remember it so we can skip next time
+                if (r.Error is null && !needsUpscale)
+                    SkipCache.MarkNoChange(r.Path);
                 task.Increment(1);
             }
         });
@@ -101,9 +111,26 @@ class UpscaleScanCommand : IAppCommand
                 sb.AppendLine();
             sb.Append("    ");
             sb.Append(issue.EntryName);
+            sb.Append(" (");
+            sb.Append(FormatSize(issue.EntrySize));
+            sb.Append(")");
             sb.Append(" \u2192 ");
             sb.Append(string.Join(", ", issue.Reasons));
         }
         return sb.ToString();
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        double kb = bytes / 1024.0;
+        if (kb < 1024)
+            return $"{kb:F1} KB";
+        double mb = kb / 1024.0;
+        if (mb < 1024)
+            return $"{mb:F2} MB";
+        double gb = mb / 1024.0;
+        return $"{gb:F2} GB";
     }
 }

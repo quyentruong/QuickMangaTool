@@ -45,7 +45,11 @@ class ColoredFileLogger : IBatchLogger
             _writer.WriteLine($"    {Red}{result.ErrorMessage}{Reset}");
 
         if (result.Detail is not null)
-            _writer.WriteLine($"    {Gray}{result.Detail}{Reset}");
+        {
+            var detailLines = result.Detail.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            foreach (var line in detailLines)
+                _writer.WriteLine($"    {Gray}{line}{Reset}");
+        }
 
         _writer.Flush();
     }

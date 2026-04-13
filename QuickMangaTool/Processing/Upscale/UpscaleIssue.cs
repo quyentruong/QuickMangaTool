@@ -6,4 +6,5 @@
 /// Human-readable list of checks that triggered, ordered by detection category
 /// (dimensions → DPI → blur → noise).
 /// </param>
-record UpscaleIssue(string EntryName, IReadOnlyList<string> Reasons);
+/// <param name="EntrySize">Uncompressed size of the entry in bytes.</param>
+record UpscaleIssue(string EntryName, long EntrySize, IReadOnlyList<string> Reasons);

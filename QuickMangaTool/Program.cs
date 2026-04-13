@@ -11,6 +11,13 @@ class Program
         if (options.DryRun)
             Console.WriteLine("Dry-run mode: no archives will be modified. Use --confirm or -y to apply changes.");
 
+        if (options.ClearCache)
+        {
+            SkipCache.Clear();
+            Console.WriteLine("Cache cleared: ~/.quickmangatool/skipcache.dat");
+            return 0;
+        }
+
         if (!Directory.Exists(options.Directory))
         {
             Console.Error.WriteLine($"Directory not found: {options.Directory}");
@@ -24,7 +31,7 @@ class Program
             return 0;
         }
 
-        var logFilePath = Path.Combine(AppContext.BaseDirectory, $"QuickMangaTool_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log");
+        var logFilePath = Path.Combine(options.Directory, $"QuickMangaTool_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log");
 
         using var logger = new ColoredFileLogger(logFilePath);
         logger.WriteHeader(DateTime.Now, options.DryRun, BuildFeatureLabel(options));

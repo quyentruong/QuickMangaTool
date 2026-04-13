@@ -26,7 +26,21 @@ class BatchProcessor : IBatchProcessor
             var po = new ParallelOptions { MaxDegreeOfParallelism = workers };
             Parallel.ForEach(files, po, cbz =>
             {
-                results.Add(_archiveProcessor.Process(cbz));
+                try
+                {
+                    if (SkipCache.ShouldSkip(cbz))
+                    {
+                        results.Add(new ProcessResult(cbz, ProcessStatus.NoChange));
+                    }
+                    else
+                    {
+                        results.Add(_archiveProcessor.Process(cbz));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new ProcessResult(cbz, ProcessStatus.Error, ex.Message));
+                }
             });
             results.CompleteAdding();
         });
@@ -39,6 +53,10 @@ class BatchProcessor : IBatchProcessor
             foreach (var result in results.GetConsumingEnumerable())
             {
                 logger.WriteEntry(result);
+
+                // Remember clean archives so we can skip them on future runs
+                if (result.Status == ProcessStatus.NoChange)
+                    SkipCache.MarkNoChange(result.FilePath);
 
                 switch (result.Status)
                 {
