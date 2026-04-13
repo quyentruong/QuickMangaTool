@@ -1,4 +1,6 @@
-﻿class Program
+﻿using Spectre.Console;
+
+class Program
 {
     static int Main(string[] args)
     {
@@ -22,30 +24,37 @@
             return 0;
         }
 
-        var logFilePath = Path.Combine(options.Directory, $"QuickMangaTool_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log");
+        var logFilePath = Path.Combine(AppContext.BaseDirectory, $"QuickMangaTool_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log");
 
         using var logger = new ColoredFileLogger(logFilePath);
-        logger.WriteHeader(DateTime.Now, options.DryRun);
+        logger.WriteHeader(DateTime.Now, options.DryRun, BuildFeatureLabel(options));
 
-        IXmlTransformation[] transformations = [new GenreToTagsTransformation()];
-        var archiveProcessor = new ArchiveProcessor(options.DryRun, transformations);
-        var batchProcessor = new BatchProcessor(archiveProcessor, logger);
-
-        var (updated, wouldUpdate) = batchProcessor.Process(cbzFiles);
-
-        logger.WriteSummary(cbzFiles.Count, updated, wouldUpdate);
-
-        if (options.DryRun)
-        {
-            Console.WriteLine($"Processed {cbzFiles.Count} .cbz files. Would update: {wouldUpdate}.");
-            Console.WriteLine("No changes were made. Re-run with --confirm or -y to apply changes.");
-        }
-        else
-        {
-            Console.WriteLine($"Processed {cbzFiles.Count} .cbz files. Updated: {updated}.");
-        }
+        var command = BuildCommand(options);
+        int result = command.Execute(cbzFiles, logger);
         Console.WriteLine($"Log saved to: {logFilePath}");
+        return result;
+    }
 
-        return 0;
+    private static IAppCommand BuildCommand(AppOptions options)
+    {
+        if (options.DetectUpscale)
+            return new UpscaleScanCommand(new UpscaleDetector(new ImageSharpQualityAnalyzer()), options.Parallelism);
+
+        var transformations = new List<IXmlTransformation>();
+        if (options.GenreToTags)
+            transformations.Add(new GenreToTagsTransformation());
+
+        return new BatchTransformCommand(
+            new BatchProcessor(new ArchiveProcessor(options.DryRun, transformations), options.Parallelism),
+            options.DryRun);
+    }
+
+    private static string BuildFeatureLabel(AppOptions options)
+    {
+        var features = new List<string>();
+        if (options.DetectUpscale) features.Add("DetectUpscale");
+        if (options.GenreToTags) features.Add("GenreToTags");
+        return features.Count > 0 ? string.Join(", ", features) : "BatchProcessing";
     }
 }
+

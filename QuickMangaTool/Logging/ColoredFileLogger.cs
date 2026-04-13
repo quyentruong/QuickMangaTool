@@ -20,10 +20,10 @@ class ColoredFileLogger : IBatchLogger
         _writer = new StreamWriter(filePath, append: false, Encoding.UTF8);
     }
 
-    public void WriteHeader(DateTime timestamp, bool dryRun)
+    public void WriteHeader(DateTime timestamp, bool dryRun, string feature)
     {
         _writer.WriteLine($"{Bold}{Blue}{Rule}{Reset}");
-        _writer.WriteLine($"  {Bold}{White}QuickMangaTool  \u00b7  {timestamp:yyyy-MM-dd HH:mm:ss}  \u00b7  Mode: {(dryRun ? "Dry Run" : "Apply Changes")}{Reset}");
+        _writer.WriteLine($"  {Bold}{White}QuickMangaTool  \u00b7  {timestamp:yyyy-MM-dd HH:mm:ss}  \u00b7  Feature: {feature}  \u00b7  Mode: {(dryRun ? "Dry Run" : "Apply Changes")}{Reset}");
         _writer.WriteLine($"{Bold}{Blue}{Rule}{Reset}");
         _writer.WriteLine();
         _writer.Flush();
@@ -43,6 +43,9 @@ class ColoredFileLogger : IBatchLogger
 
         if (result.Status == ProcessStatus.Error && result.ErrorMessage is not null)
             _writer.WriteLine($"    {Red}{result.ErrorMessage}{Reset}");
+
+        if (result.Detail is not null)
+            _writer.WriteLine($"    {Gray}{result.Detail}{Reset}");
 
         _writer.Flush();
     }
