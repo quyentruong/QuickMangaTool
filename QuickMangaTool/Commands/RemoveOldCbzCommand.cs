@@ -1,16 +1,18 @@
 using Spectre.Console;
 
 /// <summary>
-/// Standalone command that deletes all <c>.cbz.old</c> backup files left behind
+/// Standalone command that deletes all <c>.old.cbz</c> backup files left behind
 /// by a previous <c>--convert-to-webp</c> run.
 /// </summary>
 class RemoveOldCbzCommand : IAppCommand
 {
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        // Derive .old paths from the discovered .cbz files so the search root is reused
+        // Derive .old.cbz paths from the discovered .cbz files so the search root is reused
         var oldFiles = cbzFiles
-            .Select(f => f + ".old")
+            .Select(f => Path.Combine(
+                Path.GetDirectoryName(f) ?? string.Empty,
+                Path.GetFileNameWithoutExtension(f) + ".old" + Path.GetExtension(f)))
             .Where(File.Exists)
             .ToList();
 
@@ -25,7 +27,7 @@ class RemoveOldCbzCommand : IAppCommand
 
         ProgressFactory.Create().Start(ctx =>
         {
-            var task = ctx.AddTask("Removing .cbz.old backups", maxValue: oldFiles.Count);
+            var task = ctx.AddTask("Removing .old.cbz backups", maxValue: oldFiles.Count);
             const int descriptionWidth = 100;
 
             foreach (var oldFile in oldFiles)
@@ -53,7 +55,7 @@ class RemoveOldCbzCommand : IAppCommand
         });
 
         logger.WriteSummary(oldFiles.Count, deleted, 0);
-        Console.WriteLine($"Removed {deleted} .cbz.old backup file(s)." + (failed > 0 ? $" {failed} failed." : string.Empty));
+        Console.WriteLine($"Removed {deleted} .old.cbz backup file(s)." + (failed > 0 ? $" {failed} failed." : string.Empty));
         return failed > 0 ? 1 : 0;
     }
 }

@@ -132,7 +132,9 @@ class ArchiveProcessor : IArchiveProcessor
             }
         }
 
-        var oldPath = cbzPath + ".old";
+        var oldPath = Path.Combine(
+            Path.GetDirectoryName(cbzPath) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(cbzPath) + ".old" + Path.GetExtension(cbzPath));
         if (File.Exists(oldPath))
             File.Delete(oldPath);
 
