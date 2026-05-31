@@ -19,6 +19,8 @@ static class OptionsParser
         var dryRun   = !confirm || args.Contains("--dry-run") || args.Contains("-n");
         var genreToTags   = args.Contains("--genre-to-tags")   || args.Contains("-g");
         var detectUpscale = args.Contains("--detect-upscale")  || args.Contains("-u");
+        var convertToWebp = args.Contains("--convert-to-webp")  || args.Contains("-w");
+        var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
 
         int parallelism = 0;
         var pArg = args.FirstOrDefault(a => a.StartsWith("--parallel="));
@@ -35,7 +37,7 @@ static class OptionsParser
 
         // If the user supplied only a path but no feature flags, show help instead
         // of running a no-op. Valid feature flags are --genre-to-tags and --detect-upscale.
-        if (directoryArg is not null && !(genreToTags || detectUpscale || clearCache))
+        if (directoryArg is not null && !(genreToTags || detectUpscale || convertToWebp || removeOldCbz || clearCache))
         {
             PrintHelp(output);
             return null;
@@ -43,7 +45,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, parallelism, clearCache);
+        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, convertToWebp, removeOldCbz, parallelism, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -54,14 +56,20 @@ static class OptionsParser
         output.WriteLine("  --help, -h       Show this help and exit");
         output.WriteLine("  --dry-run, -n    Run in dry-run mode (no changes). This is the default");
         output.WriteLine("  --confirm, -y    Apply changes to .cbz files (must be provided to modify archives)");
-        output.WriteLine("  --genre-to-tags, -g  Apply Genre -> Tags transformation to XML metadata inside archives");
-        output.WriteLine("  --detect-upscale, -u  Analyze images inside .cbz and report which archives need upscaling");
-        output.WriteLine("  --parallel=N       Set parallel worker count for detection (default = tuned for disk)");
-        output.WriteLine("  --clear-cache, -c  Remove the cached list of previously-clean archives and exit");
+        output.WriteLine("  --genre-to-tags, -g      Apply Genre -> Tags transformation to XML metadata inside archives");
+        output.WriteLine("  --detect-upscale, -u     Analyze images inside .cbz and report which archives need upscaling");
+        output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
+        output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
+        output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
+        output.WriteLine("  --parallel=N             Set parallel worker count for detection (default = tuned for disk)");
+        output.WriteLine("  --clear-cache, -c        Remove the cached list of previously-clean archives and exit");
         output.WriteLine();
         output.WriteLine("Examples:");
         output.WriteLine("  QuickMangaTool.exe            Run dry-run in current directory (default)");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -n  Dry-run in C:\\manga");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -y  Actually apply changes in C:\\manga");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -n       Dry-run WebP conversion with size diff");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y       Convert images to WebP and keep .old backup");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y --remove-old-cbz  Convert and delete .old backup");
     }
 }

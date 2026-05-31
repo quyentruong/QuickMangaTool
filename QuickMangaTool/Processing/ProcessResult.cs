@@ -5,11 +5,15 @@ enum ProcessStatus { NoChange, Updated, WouldUpdate, Error }
 /// <param name="ErrorMessage">Set when <paramref name="Status"/> is <see cref="ProcessStatus.Error"/>.</param>
 /// <param name="Detail">
 /// Optional multi-line supplementary text logged below the entry line
-/// (e.g. per-image upscale reasons). Each line should already be indented.
+/// (e.g. per-image upscale reasons).
 /// </param>
+/// <param name="OriginalSizeBytes">Original archive size in bytes when available.</param>
+/// <param name="NewSizeBytes">New or estimated archive size in bytes when available.</param>
 record ProcessResult(
     string FilePath,
     ProcessStatus Status,
     string? ErrorMessage = null,
-    string? Detail = null);
+    string? Detail = null,
+    long? OriginalSizeBytes = null,
+    long? NewSizeBytes = null);
 

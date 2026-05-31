@@ -47,12 +47,18 @@ class Program
         if (options.DetectUpscale)
             return new UpscaleScanCommand(new UpscaleDetector(new ImageSharpQualityAnalyzer()), options.Parallelism);
 
+        // Standalone backup removal: delete all .cbz.old files without converting.
+        if (options.RemoveOldCbz && !options.ConvertToWebp)
+            return new RemoveOldCbzCommand();
+
         var transformations = new List<IXmlTransformation>();
         if (options.GenreToTags)
             transformations.Add(new GenreToTagsTransformation());
 
         return new BatchTransformCommand(
-            new BatchProcessor(new ArchiveProcessor(options.DryRun, transformations), options.Parallelism),
+            new BatchProcessor(
+                new ArchiveProcessor(options.DryRun, transformations, options.ConvertToWebp, options.RemoveOldCbz, options.Parallelism),
+                options.Parallelism),
             options.DryRun);
     }
 
@@ -61,6 +67,8 @@ class Program
         var features = new List<string>();
         if (options.DetectUpscale) features.Add("DetectUpscale");
         if (options.GenreToTags) features.Add("GenreToTags");
+        if (options.ConvertToWebp) features.Add(options.RemoveOldCbz ? "ConvertToWebP(RemoveOld)" : "ConvertToWebP(KeepOld)");
+        if (options.RemoveOldCbz && !options.ConvertToWebp) features.Add("RemoveOldBackups");
         return features.Count > 0 ? string.Join(", ", features) : "BatchProcessing";
     }
 }
