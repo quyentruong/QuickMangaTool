@@ -112,6 +112,14 @@ class ArchiveProcessor : IArchiveProcessor
 
     private ProcessResult ProcessWithBackup(string cbzPath, long originalSize)
     {
+        var oldPath = Path.Combine(
+            Path.GetDirectoryName(cbzPath) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(cbzPath) + ".old" + Path.GetExtension(cbzPath));
+
+        // If a .old.cbz backup already exists, this file was already converted in a previous run — skip immediately.
+        if (File.Exists(oldPath))
+            return new ProcessResult(cbzPath, ProcessStatus.NoChange);
+
         using (var scanZip = ZipFile.Open(cbzPath, ZipArchiveMode.Read))
         {
             var xmlWouldChange = ApplyXmlTransformations(scanZip, persistChanges: false);
@@ -131,12 +139,6 @@ class ArchiveProcessor : IArchiveProcessor
                 return new ProcessResult(cbzPath, ProcessStatus.NoChange);
             }
         }
-
-        var oldPath = Path.Combine(
-            Path.GetDirectoryName(cbzPath) ?? string.Empty,
-            Path.GetFileNameWithoutExtension(cbzPath) + ".old" + Path.GetExtension(cbzPath));
-        if (File.Exists(oldPath))
-            File.Delete(oldPath);
 
         File.Move(cbzPath, oldPath);
         File.Copy(oldPath, cbzPath);

@@ -24,7 +24,9 @@ class Program
             return 1;
         }
 
-        var cbzFiles = Directory.EnumerateFiles(options.Directory, "*.cbz", SearchOption.AllDirectories).ToList();
+        var cbzFiles = Directory.EnumerateFiles(options.Directory, "*.cbz", SearchOption.AllDirectories)
+            .Where(f => !f.EndsWith(".old.cbz", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         if (cbzFiles.Count == 0)
         {
             Console.WriteLine("No .cbz files found.");
