@@ -8,8 +8,6 @@ static class ProgressFactory
             .HideCompleted(false)
             .Columns(
                 new ProgressBarColumn(),
-                new PercentageColumn(),
-                new RemainingTimeColumn(),
                 new SpinnerColumn(),
-                new TaskDescriptionColumn());
+                new TaskDescriptionColumn { Alignment = Justify.Left });
 }

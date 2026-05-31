@@ -17,50 +17,67 @@ class BatchProcessor : IBatchProcessor
         int updatedCount = 0;
         int wouldUpdateCount = 0;
         int workers = WorkerCount.Resolve(_parallelism);
-        const int descriptionWidth = 100;
+        //const int descriptionWidth = 100;
 
-        // Two channels: one for in-progress file names, one for completed results.
-        using var statusUpdates = new BlockingCollection<(string Label, string Path)>();
+        // Channel for completed results; the per-worker ProgressTasks handle in-progress display.
         using var results = new BlockingCollection<ProcessResult>();
-
-        var producer = Task.Run(() =>
-        {
-            var po = new ParallelOptions { MaxDegreeOfParallelism = workers };
-            Parallel.ForEach(files, po, cbz =>
-            {
-                // Push a "Converting" status as soon as a worker picks up the file
-                statusUpdates.Add(("Converting", cbz));
-                try
-                {
-                    results.Add(_archiveProcessor.Process(cbz));
-                }
-                catch (Exception ex)
-                {
-                    results.Add(new ProcessResult(cbz, ProcessStatus.Error, ex.Message));
-                }
-            });
-            statusUpdates.CompleteAdding();
-            results.CompleteAdding();
-        });
 
         ProgressFactory.Create().Start(ctx =>
         {
-            var task = ctx.AddTask(
-                Markup.Escape(ProgressDescriptionFormatter.Format("Waiting", files[0], descriptionWidth)),
+            // One overall progress task that advances once per completed file.
+            // Description shows a simple [done/total] counter so the label is always accurate.
+            int completedCount = 0;
+            var overallTask = ctx.AddTask(
+                Markup.Escape($"[0 / {files.Count} files]"),
                 maxValue: files.Count);
 
-            // Drain both channels; status updates move the label forward while
-            // result processing advances the progress bar and logs the outcome.
-            var statusEnumerator = statusUpdates.GetConsumingEnumerable().GetEnumerator();
+            // One ProgressTask per worker slot — each shows which file that slot is processing.
+            // Marked IsIndeterminate so the progress bar animates instead of showing a stuck 0%.
+            var workerTasks = Enumerable.Range(0, workers)
+                .Select(i =>
+                {
+                    var t = ctx.AddTask($"Worker {i + 1}: Idle", maxValue: 1);
+                    t.IsIndeterminate = true;
+                    return t;
+                })
+                .ToArray();
+
+            // Pool of available worker slot indices — dequeued when a file starts, re-enqueued when it finishes.
+            var slotPool = new ConcurrentQueue<int>(Enumerable.Range(0, workers));
+
+            var producer = Task.Run(() =>
+            {
+                var po = new ParallelOptions { MaxDegreeOfParallelism = workers };
+                Parallel.ForEach(files, po, cbz =>
+                {
+                    // Claim a worker slot and show the file being converted on that slot's row.
+                    slotPool.TryDequeue(out int slot);
+                    workerTasks[slot].Description =
+                        Markup.Escape($"Worker {slot + 1}: Converting: {Path.GetFileName(cbz)}");
+
+                    try
+                    {
+                        results.Add(_archiveProcessor.Process(cbz));
+                    }
+                    catch (Exception ex)
+                    {
+                        results.Add(new ProcessResult(cbz, ProcessStatus.Error, ex.Message));
+                    }
+                    finally
+                    {
+                        // Reset the slot's label and return it to the pool for the next file.
+                        workerTasks[slot].Description =
+                            Markup.Escape($"Worker {slot + 1}: Idle");
+                        slotPool.Enqueue(slot);
+                    }
+                });
+
+                results.CompleteAdding();
+            });
+
+            // Consume completed results: log the outcome and advance the overall progress bar.
             foreach (var result in results.GetConsumingEnumerable())
             {
-                // Advance the "Converting: <file>" label from the status channel
-                if (statusEnumerator.MoveNext())
-                {
-                    var (statusLabel, statusPath) = statusEnumerator.Current;
-                    task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(statusLabel, statusPath, descriptionWidth));
-                }
-
                 logger.WriteEntry(result);
 
                 switch (result.Status)
@@ -69,20 +86,14 @@ class BatchProcessor : IBatchProcessor
                     case ProcessStatus.WouldUpdate: wouldUpdateCount++; break;
                 }
 
-                var doneLabel = result.Status switch
-                {
-                    ProcessStatus.Updated => "Converted",
-                    ProcessStatus.WouldUpdate => "Would convert",
-                    ProcessStatus.Error => "Error",
-                    _ => "No conversion",
-                };
-
-                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(doneLabel, result.FilePath, descriptionWidth));
-                task.Increment(1);
+                completedCount++;
+                overallTask.Description = Markup.Escape($"[{completedCount} / {files.Count} files]");
+                overallTask.Increment(1);
             }
+
+            producer.Wait();
         });
 
-        producer.Wait();
         return (updatedCount, wouldUpdateCount);
     }
 }
