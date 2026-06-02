@@ -1,4 +1,6 @@
 using System.Text;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 class ReadLogsCommand : IAppCommand
 {
@@ -29,7 +31,7 @@ class ReadLogsCommand : IAppCommand
 
         Console.WriteLine();
         Console.Write("Select log to read by number, comma-separated list, or 'all': ");
-        var input = Console.ReadLine();
+        string? input = Console.ReadLine();
         if (string.IsNullOrWhiteSpace(input))
             return 0;
 
@@ -65,9 +67,90 @@ class ReadLogsCommand : IAppCommand
 
     private static void PrintFile(string path)
     {
-        Console.WriteLine($"==== {path} ====");
-        foreach (var line in File.ReadLines(path, Encoding.UTF8))
-            Console.WriteLine(line);
+        Console.WriteLine($"==== {path} ====\n");
+
+        // If output is redirected (e.g. piped to less), just write raw lines.
+        if (Console.IsOutputRedirected)
+        {
+            foreach (var line in File.ReadLines(path, Encoding.UTF8))
+                Console.WriteLine(line);
+            Console.WriteLine();
+            return;
+        }
+
+        // Prefer external pager if configured or available
+        var pagerEnv = Environment.GetEnvironmentVariable("PAGER");
+        string? pager = null;
+        if (!string.IsNullOrWhiteSpace(pagerEnv))
+            pager = pagerEnv;
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            pager = "more"; // present on Windows
+        else
+            pager = "less"; // common on Unix-like systems
+
+        if (!string.IsNullOrWhiteSpace(pager))
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = pager,
+                    Arguments = $"\"{path}\"",
+                    UseShellExecute = false,
+                    RedirectStandardInput = false,
+                    RedirectStandardOutput = false,
+                    CreateNoWindow = false
+                };
+                using var proc = Process.Start(psi);
+                proc?.WaitForExit();
+                Console.WriteLine();
+                return;
+            }
+            catch
+            {
+                // fall through to in-app pager
+            }
+        }
+
+        // Fallback: simple in-app pager (space = next page, Enter = next line, q = quit)
+        var enumerator = File.ReadLines(path, Encoding.UTF8).GetEnumerator();
+        int pageSize = Math.Max(1, Console.WindowHeight - 2);
+        int shown = 0;
+        while (enumerator.MoveNext())
+        {
+            Console.WriteLine(enumerator.Current);
+            shown++;
+            if (shown % pageSize == 0)
+            {
+                Console.Write("--More-- (Space=page, Enter=line, q=quit) ");
+                var key = Console.ReadKey(intercept: true);
+                Console.WriteLine();
+                if (key.Key == ConsoleKey.Q)
+                    break;
+
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    // show one more line immediately
+                    if (enumerator.MoveNext())
+                    {
+                        Console.WriteLine(enumerator.Current);
+                        shown++;
+                    }
+                }
+                else if (key.Key == ConsoleKey.Spacebar)
+                {
+                    // start next page; recalc in case window resized
+                    pageSize = Math.Max(1, Console.WindowHeight - 2);
+                    continue;
+                }
+                else
+                {
+                    // any other key: quit
+                    break;
+                }
+            }
+        }
+
         Console.WriteLine();
     }
 }
