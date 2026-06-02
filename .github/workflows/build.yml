@@ -3,6 +3,7 @@ name: Build
 on:
   workflow_dispatch:
 
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,29 +13,32 @@ jobs:
         runtime: [ linux-x64, win-x64 ]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore QuickMangaTool/QuickMangaTool.csproj
+    - name: Restore dependencies
+      run: dotnet restore QuickMangaTool/QuickMangaTool.csproj
 
-      - name: Build
-        run: dotnet build QuickMangaTool/QuickMangaTool.csproj --configuration Release --no-restore
+    - name: Run tests
+      id: test
+      run: dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release
 
-      - name: Publish (${{ matrix.runtime }})
-        run: >
-          dotnet publish QuickMangaTool/QuickMangaTool.csproj
-          --configuration Release
-          --runtime ${{ matrix.runtime }}
-          --output publish/${{ matrix.runtime }}
+    - name: Build
+      run: dotnet build QuickMangaTool/QuickMangaTool.csproj --configuration Release --no-restore
 
-      - name: Upload artifact (${{ matrix.runtime }})
-        uses: actions/upload-artifact@v4
-        with:
-          name: QuickMangaTool-${{ matrix.runtime }}
-          path: publish/${{ matrix.runtime }}/
+    - name: Publish (${{ matrix.runtime }})
+      if: ${{ steps.test.outcome == 'success' }}
+      run: >
+        dotnet publish QuickMangaTool/QuickMangaTool.csproj --configuration Release --runtime ${{ matrix.runtime }} --output publish/${{ matrix.runtime }}
+
+    - name: Upload artifact (${{ matrix.runtime }})
+      if: ${{ steps.test.outcome == 'success' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: QuickMangaTool-${{ matrix.runtime }}
+        path: publish/${{ matrix.runtime }}/
