@@ -5,5 +5,7 @@ record AppOptions(
     bool DetectUpscale,
     bool ConvertToWebp,
     bool RemoveOldCbz,
+    bool ReadLogs,
+    bool DeleteLogs,
     int Parallelism,
     bool ClearCache);

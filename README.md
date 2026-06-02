@@ -37,6 +37,58 @@ Run it on Linux:
 
 ```bash
 ./QuickMangaTool/bin/Release/net10.0/linux-x64/publish/QuickMangaTool
+
+```
+
+## Test coverage
+
+You can collect test coverage with Coverlet and render an HTML report using ReportGenerator.
+
+1. Add Coverlet to the test project (one-time):
+
+```bash
+dotnet add QuickMangaTool.Tests/QuickMangaTool.Tests.csproj package coverlet.msbuild
+```
+
+2. Run tests and produce an OpenCover-format coverage file:
+
+```bash
+dotnet test QuickMangaTool.slnx --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./coverage/
+```
+
+3. Install ReportGenerator (global tool) and create an HTML report:
+
+```bash
+dotnet tool install -g dotnet-reportgenerator-globaltool
+reportgenerator -reports:"**/coverage.opencover.xml" -targetdir:"coverage-report" -reporttypes:Html
+```
+
+4. Open the report by opening `coverage-report/index.htm` in your browser.
+
+This writes coverage files under `TestResults/`; you can point ReportGenerator at the produced coverage XML files to generate the same HTML output.
+
+## Log commands
+
+Two standalone commands help manage run log files written to the target directory:
+
+- `--read-logs` — interactively read one or more `.log` files found under the given path.
+	- If a single `.log` file is found it is printed immediately.
+	- If multiple are found you are shown a numbered list and prompted to choose by number, a comma-separated list (e.g. `1,3`), or `all` to print every log.
+
+- `--delete-logs` — deletes all `.log` files found under the given path. Returns non-zero if any deletions fail.
+
+Both commands accept an optional path as the first argument. Examples:
+
+```bash
+# Read logs under the current directory (interactive selection)
+QuickMangaTool --read-logs
+
+# Read logs under a specific directory
+QuickMangaTool /path/to/manga --read-logs
+
+# Delete all logs under a directory
+QuickMangaTool /path/to/manga --delete-logs
+```
 ```
 
 ## Usage

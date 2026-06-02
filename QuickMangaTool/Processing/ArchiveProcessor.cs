@@ -10,6 +10,7 @@ class ArchiveProcessor : IArchiveProcessor
     private readonly bool _removeOldCbz;
     private readonly int _parallelism;
     private readonly IArchiveImageConverter _imageConverter;
+    private readonly Action<ZipArchive>? _updateHook;
 
     public ArchiveProcessor(
         bool dryRun,
@@ -17,7 +18,8 @@ class ArchiveProcessor : IArchiveProcessor
         bool convertToWebp,
         bool removeOldCbz,
         int parallelism = 0,
-        IArchiveImageConverter? imageConverter = null)
+        IArchiveImageConverter? imageConverter = null,
+        Action<ZipArchive>? updateHook = null)
     {
         _dryRun = dryRun;
         _transformations = transformations;
@@ -25,6 +27,7 @@ class ArchiveProcessor : IArchiveProcessor
         _removeOldCbz = removeOldCbz;
         _parallelism = parallelism;
         _imageConverter = imageConverter ?? new WebpArchiveImageConverter();
+        _updateHook = updateHook;
     }
 
     public ProcessResult Process(string cbzPath)
@@ -150,6 +153,9 @@ class ArchiveProcessor : IArchiveProcessor
 
             using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
             {
+                // testing hook: allow injected action to run inside the update phase
+                _updateHook?.Invoke(zip);
+
                 var xmlChanged = ApplyXmlTransformations(zip, persistChanges: true);
                 webpResult = ConvertImagesToWebp(zip, persistChanges: true);
                 changed = xmlChanged || webpResult.WebpKeptCount > 0;
@@ -326,13 +332,13 @@ class ArchiveProcessor : IArchiveProcessor
         if (totalProcessed > 0)
         {
             lines.Add($"Images processed: {totalProcessed}  (WebP kept: {webpResult.WebpKeptCount}  ·  Original kept (smaller): {webpResult.OriginalKeptCount})");
-            lines.Add($"Original size:    {FormatSize(originalSize)}");
+            lines.Add($"Original size:    {SizeFormatter.FormatSize(originalSize)}");
 
             if (newSize is not null)
             {
                 var delta = newSize.Value - originalSize;
-                lines.Add($"New size:         {FormatSize(newSize.Value)}");
-                lines.Add($"Size delta:       {(delta < 0 ? "-" : "+")}{FormatSize(Math.Abs(delta))}");
+                lines.Add($"New size:         {SizeFormatter.FormatSize(newSize.Value)}");
+                lines.Add($"Size delta:       {(delta < 0 ? "-" : "+")}{SizeFormatter.FormatSize(Math.Abs(delta))}");
             }
         }
         else
@@ -350,17 +356,5 @@ class ArchiveProcessor : IArchiveProcessor
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string FormatSize(long bytes)
-    {
-        if (bytes < 1024)
-            return $"{bytes} B";
-        double kb = bytes / 1024.0;
-        if (kb < 1024)
-            return $"{kb:F1} KB";
-        double mb = kb / 1024.0;
-        if (mb < 1024)
-            return $"{mb:F2} MB";
-        double gb = mb / 1024.0;
-        return $"{gb:F2} GB";
-    }
+    
 }

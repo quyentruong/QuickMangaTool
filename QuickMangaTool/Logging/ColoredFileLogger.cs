@@ -41,11 +41,11 @@ class ColoredFileLogger : IBatchLogger
 
         _writer.WriteLine($"  {Gray}[{DateTime.Now:HH:mm:ss}]{Reset} {color}{icon} {label,-14}{Reset} {Cyan}{result.FilePath}{Reset}");
 
-        if (result.OriginalSizeBytes is not null && result.NewSizeBytes is not null)
+            if (result.OriginalSizeBytes is not null && result.NewSizeBytes is not null)
         {
             var delta = result.NewSizeBytes.Value - result.OriginalSizeBytes.Value;
             var deltaPrefix = delta < 0 ? "-" : "+";
-            _writer.WriteLine($"    {Gray}Size: {FormatSize(result.OriginalSizeBytes.Value)} -> {FormatSize(result.NewSizeBytes.Value)} ({deltaPrefix}{FormatSize(Math.Abs(delta))}){Reset}");
+            _writer.WriteLine($"    {Gray}Size: {SizeFormatter.FormatSize(result.OriginalSizeBytes.Value)} -> {SizeFormatter.FormatSize(result.NewSizeBytes.Value)} ({deltaPrefix}{SizeFormatter.FormatSize(Math.Abs(delta))}){Reset}");
         }
 
         if (result.Status == ProcessStatus.Error && result.ErrorMessage is not null)
@@ -73,19 +73,7 @@ class ColoredFileLogger : IBatchLogger
         _writer.Flush();
     }
 
-    private static string FormatSize(long bytes)
-    {
-        if (bytes < 1024)
-            return $"{bytes} B";
-        double kb = bytes / 1024.0;
-        if (kb < 1024)
-            return $"{kb:F1} KB";
-        double mb = kb / 1024.0;
-        if (mb < 1024)
-            return $"{mb:F2} MB";
-        double gb = mb / 1024.0;
-        return $"{gb:F2} GB";
-    }
+    
 
     public void Dispose() => _writer.Dispose();
 }

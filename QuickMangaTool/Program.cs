@@ -24,6 +24,15 @@ class Program
             return 1;
         }
 
+        var command = BuildCommand(options);
+
+        // If the selected command is a standalone log command, execute it without
+        // requiring discovery of .cbz files or creating a log file.
+        if (options.ReadLogs || options.DeleteLogs)
+        {
+            return command.Execute(Array.Empty<string>(), new NoopRunLogger());
+        }
+
         var cbzFiles = Directory.EnumerateFiles(options.Directory, "*.cbz", SearchOption.AllDirectories)
             .Where(f => !f.EndsWith(".old.cbz", StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -38,7 +47,6 @@ class Program
         using var logger = new ColoredFileLogger(logFilePath);
         logger.WriteHeader(DateTime.Now, options.DryRun, BuildFeatureLabel(options));
 
-        var command = BuildCommand(options);
         int result = command.Execute(cbzFiles, logger);
         Console.WriteLine($"Log saved to: {logFilePath}");
         return result;
@@ -46,6 +54,12 @@ class Program
 
     private static IAppCommand BuildCommand(AppOptions options)
     {
+        if (options.ReadLogs)
+            return new ReadLogsCommand(options.Directory);
+
+        if (options.DeleteLogs)
+            return new DeleteLogsCommand(options.Directory);
+
         if (options.DetectUpscale)
             return new UpscaleScanCommand(new UpscaleDetector(new ImageSharpQualityAnalyzer()), options.Parallelism);
 

@@ -21,6 +21,8 @@ static class OptionsParser
         var detectUpscale = args.Contains("--detect-upscale")  || args.Contains("-u");
         var convertToWebp = args.Contains("--convert-to-webp")  || args.Contains("-w");
         var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
+        var readLogs = args.Contains("--read-logs");
+        var deleteLogs = args.Contains("--delete-logs");
 
         int parallelism = 0;
         var pArg = args.FirstOrDefault(a => a.StartsWith("--parallel="));
@@ -36,8 +38,9 @@ static class OptionsParser
         var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-'));
 
         // If the user supplied only a path but no feature flags, show help instead
-        // of running a no-op. Valid feature flags are --genre-to-tags and --detect-upscale.
-        if (directoryArg is not null && !(genreToTags || detectUpscale || convertToWebp || removeOldCbz || clearCache))
+        // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
+        // and the standalone log commands.
+        if (directoryArg is not null && !(genreToTags || detectUpscale || convertToWebp || removeOldCbz || clearCache || readLogs || deleteLogs))
         {
             PrintHelp(output);
             return null;
@@ -45,7 +48,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, convertToWebp, removeOldCbz, parallelism, clearCache);
+        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, convertToWebp, removeOldCbz, readLogs, deleteLogs, parallelism, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -61,6 +64,8 @@ static class OptionsParser
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
         output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
         output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
+        output.WriteLine("  --read-logs               Print all .log files found under the given path to the console");
+        output.WriteLine("  --delete-logs             Delete all .log files found under the given path");
         output.WriteLine("  --parallel=N             Set parallel worker count for detection (default = tuned for disk)");
         output.WriteLine("  --clear-cache, -c        Remove the cached list of previously-clean archives and exit");
         output.WriteLine();
@@ -71,5 +76,7 @@ static class OptionsParser
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -n       Dry-run WebP conversion with size diff");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y       Convert images to WebP and keep .old backup");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y --remove-old-cbz  Convert and delete .old backup");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --read-logs  Print logs under C:\\manga");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --delete-logs  Delete logs under C:\\manga");
     }
 }
