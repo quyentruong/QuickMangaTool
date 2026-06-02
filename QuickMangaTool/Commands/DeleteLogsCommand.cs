@@ -12,6 +12,19 @@ class DeleteLogsCommand : IAppCommand
             Console.WriteLine("No .log files found.");
             return 0;
         }
+        Console.WriteLine("Found the following .log files:");
+        foreach (var lf in logFiles)
+        {
+            Console.WriteLine(lf);
+        }
+
+        Console.Write($"Delete these {logFiles.Count} file(s)? (y/N): ");
+        var answer = Console.ReadLine();
+        if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Aborted. No files deleted.");
+            return 0;
+        }
 
         int deleted = 0;
         int failed = 0;
