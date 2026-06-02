@@ -84,7 +84,7 @@ class ReadLogsCommand : IAppCommand
         if (!string.IsNullOrWhiteSpace(pagerEnv))
             pager = pagerEnv;
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            pager = "more"; // present on Windows
+            pager = "more.com"; // use native more.com which works correctly in PowerShell
         else
             pager = "less"; // common on Unix-like systems
 
