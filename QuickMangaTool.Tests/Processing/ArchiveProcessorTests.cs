@@ -165,7 +165,7 @@ public class ArchiveProcessorTests : IDisposable
         public bool Apply(System.Xml.Linq.XDocument doc)
         {
             // add a marker comment to ensure a written change
-            doc.Root.Add(new System.Xml.Linq.XComment("appended"));
+            doc.Root!.Add(new System.Xml.Linq.XComment("appended"));
             return true;
         }
     }
