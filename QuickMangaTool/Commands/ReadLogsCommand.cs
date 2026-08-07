@@ -1,6 +1,8 @@
 using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
+using System.Globalization;
 
 class ReadLogsCommand : IAppCommand
 {
@@ -10,7 +12,12 @@ class ReadLogsCommand : IAppCommand
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        var logFiles = Directory.EnumerateFiles(_root, "*.log", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+        var logFiles = Directory.EnumerateFiles(_root, "*.log", SearchOption.AllDirectories)
+            .Select(f => new { Path = f, Timestamp = ParseTimestampFromFilename(f) })
+            .OrderBy(x => x.Timestamp ?? DateTime.MinValue)
+            .ThenBy(x => x.Path)
+            .Select(x => x.Path)
+            .ToList();
         if (logFiles.Count == 0)
         {
             Console.WriteLine("No .log files found.");
@@ -152,5 +159,25 @@ class ReadLogsCommand : IAppCommand
         }
 
         Console.WriteLine();
+    }
+
+    private static DateTime? ParseTimestampFromFilename(string path)
+    {
+        try
+        {
+            var name = Path.GetFileNameWithoutExtension(path);
+            var m = Regex.Match(name, @"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}");
+            if (!m.Success)
+                return null;
+
+            if (DateTime.TryParseExact(m.Value, "yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
+                return dt;
+        }
+        catch
+        {
+            // ignore parse errors and treat as no timestamp
+        }
+
+        return null;
     }
 }

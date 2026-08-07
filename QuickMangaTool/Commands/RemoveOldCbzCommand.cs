@@ -22,6 +22,20 @@ class RemoveOldCbzCommand : IAppCommand
             return 0;
         }
 
+        Console.WriteLine("Found the following .old.cbz backup files:");
+        foreach (var f in oldFiles)
+        {
+            Console.WriteLine(f);
+        }
+
+        Console.Write($"Delete these {oldFiles.Count} file(s)? (y/N): ");
+        var answer = Console.ReadLine();
+        if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine("Aborted. No files deleted.");
+            return 0;
+        }
+
         int deleted = 0;
         int failed = 0;
 

@@ -8,7 +8,9 @@ class Program
         if (options is null)
             return 0;
 
-        if (options.DryRun)
+        // Only show the dry-run banner when running batch operations —
+        // standalone log commands shouldn't print this message.
+        if (options.DryRun && !options.ReadLogs && !options.DeleteLogs && !options.RemoveOldCbz && !options.DetectUpscale)
             Console.WriteLine("Dry-run mode: no archives will be modified. Use --confirm or -y to apply changes.");
 
         if (options.ClearCache)
