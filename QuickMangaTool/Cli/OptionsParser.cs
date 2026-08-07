@@ -20,6 +20,7 @@ static class OptionsParser
         var genreToTags   = args.Contains("--genre-to-tags")   || args.Contains("-g");
         var detectUpscale = args.Contains("--detect-upscale")  || args.Contains("-u");
         var convertToWebp = args.Contains("--convert-to-webp")  || args.Contains("-w");
+        var compressFolders = args.Contains("--compress-folders") || args.Contains("--compress");
         var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
         var readLogs = args.Contains("--read-logs");
         var deleteLogs = args.Contains("--delete-logs");
@@ -39,8 +40,8 @@ static class OptionsParser
 
         // If the user supplied only a path but no feature flags, show help instead
         // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
-        // and the standalone log commands.
-        if (directoryArg is not null && !(genreToTags || detectUpscale || convertToWebp || removeOldCbz || clearCache || readLogs || deleteLogs))
+        // compress-folders, and the standalone log commands.
+        if (directoryArg is not null && !(genreToTags || detectUpscale || compressFolders || convertToWebp || removeOldCbz || clearCache || readLogs || deleteLogs))
         {
             PrintHelp(output);
             return null;
@@ -48,7 +49,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, convertToWebp, removeOldCbz, readLogs, deleteLogs, parallelism, clearCache);
+        return new AppOptions(directory, dryRun, genreToTags, detectUpscale, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, parallelism, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -62,6 +63,7 @@ static class OptionsParser
         output.WriteLine("  --genre-to-tags, -g      Apply Genre -> Tags transformation to XML metadata inside archives");
         output.WriteLine("  --detect-upscale, -u     Analyze images inside .cbz and report which archives need upscaling");
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
+        output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
         output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
         output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
         output.WriteLine("  --read-logs               Print all .log files found under the given path to the console");

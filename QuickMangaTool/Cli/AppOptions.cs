@@ -3,6 +3,7 @@ record AppOptions(
     bool DryRun,
     bool GenreToTags,
     bool DetectUpscale,
+    bool CompressFolders,
     bool ConvertToWebp,
     bool RemoveOldCbz,
     bool ReadLogs,
