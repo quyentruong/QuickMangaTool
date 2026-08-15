@@ -5,7 +5,7 @@ class WebpArchiveImageConverter : IArchiveImageConverter
 {
     private static readonly HashSet<string> SupportedExtensions =
     [
-        ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff", ".avif"
+        ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"
     ];
 
     private readonly WebpEncoder _encoder;

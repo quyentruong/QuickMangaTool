@@ -85,8 +85,17 @@ class CompressFoldersCommand : IAppCommand
                     {
                         try
                         {
-                            using var ms = new MemoryStream(raw[i].Data);
-                            converted[i] = (converter.Convert(Path.GetFileName(raw[i].FilePath), ms), null);
+                            var fileName = Path.GetFileName(raw[i].FilePath);
+                            if (!converter.CanConvert(fileName))
+                            {
+                                // Return the original bytes when the converter doesn't support this extension
+                                converted[i] = (new ConvertedImage(fileName, raw[i].Data, raw[i].Data.Length, 0, WebpWasSmaller: false), null);
+                            }
+                            else
+                            {
+                                using var ms = new MemoryStream(raw[i].Data);
+                                converted[i] = (converter.Convert(fileName, ms), null);
+                            }
                         }
                         catch (Exception ex)
                         {
