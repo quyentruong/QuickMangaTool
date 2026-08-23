@@ -1,12 +1,15 @@
 record AppOptions(
     string Directory,
     bool DryRun,
+    bool AddDuplicates,
     bool GenreToTags,
     bool DetectUpscale,
+    bool DetectDuplicates,
     bool CompressFolders,
     bool ConvertToWebp,
     bool RemoveOldCbz,
     bool ReadLogs,
     bool DeleteLogs,
     int Parallelism,
+    int PhashThreshold,
     bool ClearCache);

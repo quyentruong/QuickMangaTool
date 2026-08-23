@@ -137,6 +137,24 @@ public class OptionsParserTests
     }
 
     [Fact]
+    public void AddDuplicatesFlag_Long_SetsAddDuplicates()
+    {
+        var options = Parse("--add-duplicates");
+
+        Assert.NotNull(options);
+        Assert.True(options.AddDuplicates);
+    }
+
+    [Fact]
+    public void DetectDuplicatesFlag_Long_SetsDetectDuplicates()
+    {
+        var options = Parse("--detect-duplicates");
+
+        Assert.NotNull(options);
+        Assert.True(options.DetectDuplicates);
+    }
+
+    [Fact]
     public void ConvertToWebpFlag_Long_SetsConvertToWebp()
     {
         var options = Parse("--convert-to-webp");
@@ -199,6 +217,24 @@ public class OptionsParserTests
 
         Assert.NotNull(options);
         Assert.Equal(0, options.Parallelism);
+    }
+
+    [Fact]
+    public void PhashThresholdFlag_ParsesValue()
+    {
+        var options = Parse("--detect-duplicates", "--phash-threshold=12");
+
+        Assert.NotNull(options);
+        Assert.Equal(12, options.PhashThreshold);
+    }
+
+    [Fact]
+    public void PhashThresholdFlag_DefaultsToEight_WhenMissing()
+    {
+        var options = Parse("--detect-duplicates");
+
+        Assert.NotNull(options);
+        Assert.Equal(8, options.PhashThreshold);
     }
 
     // ── Directory ─────────────────────────────────────────────────────────
