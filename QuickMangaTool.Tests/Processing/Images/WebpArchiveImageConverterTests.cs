@@ -23,7 +23,6 @@ public class WebpArchiveImageConverterTests
     [InlineData("image.gif")]
     [InlineData("image.tif")]
     [InlineData("image.tiff")]
-    [InlineData("image.avif")]
     [InlineData("IMAGE.JPG")]   // case-insensitive
     [InlineData("sub/dir/page.PNG")]
     public void CanConvert_SupportedExtension_ReturnsTrue(string entryName)
@@ -35,6 +34,7 @@ public class WebpArchiveImageConverterTests
     [InlineData("image.webp")]
     [InlineData("image.txt")]
     [InlineData("ComicInfo.xml")]
+    [InlineData("image.avif")]
     [InlineData("image")]       // no extension
     public void CanConvert_UnsupportedExtension_ReturnsFalse(string entryName)
     {

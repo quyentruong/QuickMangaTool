@@ -12,14 +12,23 @@ public class RemoveOldCbzCommandTests : IDisposable
     private readonly string _tempDir;
     private readonly Mock<IRunLogger> _loggerMock = new();
     private readonly RemoveOldCbzCommand _sut = new();
+    private readonly TextReader _originalIn;
 
     public RemoveOldCbzCommandTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(_tempDir);
+        _originalIn = Console.In;
+        // Provide a non-blocking Console input that always answers 'y' to confirmation prompts
+        Console.SetIn(new AlwaysYesTextReader());
     }
 
-    public void Dispose() => Directory.Delete(_tempDir, recursive: true);
+    public void Dispose()
+    {
+        // Restore original console input and clean up temp directory
+        Console.SetIn(_originalIn);
+        Directory.Delete(_tempDir, recursive: true);
+    }
 
     // ── No .old.cbz files present ─────────────────────────────────────────
 
@@ -177,5 +186,11 @@ public class RemoveOldCbzCommandTests : IDisposable
         var oldPath = Path.Combine(_tempDir, nameWithoutExt + ".old" + ext);
         File.WriteAllBytes(oldPath, []);
         return oldPath;
+    }
+
+    /// <summary>TextReader that always returns "y" for ReadLine so Console.ReadLine won't block in tests.</summary>
+    private class AlwaysYesTextReader : TextReader
+    {
+        public override string? ReadLine() => "y";
     }
 }
