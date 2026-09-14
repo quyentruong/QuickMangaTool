@@ -10,6 +10,7 @@ record AppOptions(
     bool RemoveOldCbz,
     bool ReadLogs,
     bool DeleteLogs,
+    bool PdfToCbz,
     int Parallelism,
     int PhashThreshold,
     bool ClearCache);

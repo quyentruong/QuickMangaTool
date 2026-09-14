@@ -22,6 +22,7 @@ static class OptionsParser
         var detectUpscale = args.Contains("--detect-upscale")  || args.Contains("-u");
         var detectDuplicates = args.Contains("--detect-duplicates") || args.Contains("--detect-dups");
         var convertToWebp = args.Contains("--convert-to-webp")  || args.Contains("-w");
+        var pdfToCbz = args.Contains("--pdf-to-cbz");
         var compressFolders = args.Contains("--compress-folders") || args.Contains("--compress");
         var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
         var readLogs = args.Contains("--read-logs");
@@ -51,8 +52,8 @@ static class OptionsParser
 
         // If the user supplied only a path but no feature flags, show help instead
         // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
-        // compress-folders, and the standalone log commands.
-        if (directoryArg is not null && !(addDuplicates || genreToTags || detectUpscale || detectDuplicates || compressFolders || convertToWebp || removeOldCbz || clearCache || readLogs || deleteLogs))
+        // compress-folders, pdf-to-cbz and the standalone log commands.
+        if (directoryArg is not null && !(addDuplicates || genreToTags || detectUpscale || detectDuplicates || compressFolders || convertToWebp || removeOldCbz || pdfToCbz || clearCache || readLogs || deleteLogs))
         {
             PrintHelp(output);
             return null;
@@ -60,7 +61,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, parallelism, phashThreshold, clearCache);
+        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, pdfToCbz, parallelism, phashThreshold, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -77,6 +78,7 @@ static class OptionsParser
         output.WriteLine("  --detect-duplicates      Scan .cbz archives and detect duplicate images using duplicates.db and pHash similarity");
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
         output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
+        output.WriteLine("  --pdf-to-cbz             Scan a folder for PDF files and produce a .cbz next to each PDF (non-recursive, skips existing .cbz)");
         output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
         output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
         output.WriteLine("  --read-logs               Print all .log files found under the given path to the console");

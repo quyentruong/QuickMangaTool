@@ -133,6 +133,11 @@ QuickMangaTool.exe C:\manga -g -u -y
 
 # Clear the skip cache
 QuickMangaTool.exe --clear-cache
+
+# Convert all PDFs in a folder to CBZ (non-recursive). For each `sample.pdf` the tool
+# will create `sample.cbz` next to the PDF, skipping any PDFs that already have a
+# corresponding `.cbz` file.
+QuickMangaTool.exe /path/to/folder --pdf-to-cbz
 ```
 
 ## Commands

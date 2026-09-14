@@ -31,7 +31,7 @@ class Program
 
         // If the selected command is a standalone log or folder-compress command, execute it without
         // requiring discovery of .cbz files or creating a log file.
-        if (options.ReadLogs || options.DeleteLogs || options.CompressFolders || options.AddDuplicates)
+        if (options.ReadLogs || options.DeleteLogs || options.CompressFolders || options.AddDuplicates || options.PdfToCbz)
         {
             return command.Execute(Array.Empty<string>(), new NoopRunLogger());
         }
@@ -97,6 +97,9 @@ class Program
 
         if (options.CompressFolders)
             return new CompressFoldersCommand(options.Directory);
+
+        if (options.PdfToCbz)
+            return new ExtractPdfToCbzCommand(options.Directory);
 
         // Standalone backup removal: delete all .cbz.old files without converting.
         if (options.RemoveOldCbz && !options.ConvertToWebp)
