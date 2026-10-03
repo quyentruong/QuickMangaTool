@@ -11,6 +11,7 @@ record AppOptions(
     bool ReadLogs,
     bool DeleteLogs,
     bool PdfToCbz,
+    bool CbrToCbz,
     int Parallelism,
     int PhashThreshold,
     bool ClearCache);

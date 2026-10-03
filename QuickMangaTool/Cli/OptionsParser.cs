@@ -27,6 +27,7 @@ static class OptionsParser
         var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
         var readLogs = args.Contains("--read-logs");
         var deleteLogs = args.Contains("--delete-logs");
+        var cbrToCbz = args.Contains("--cbr-to-cbz");
 
         int phashThreshold = 8;
         var tArg = args.FirstOrDefault(a => a.StartsWith("--phash-threshold="));
@@ -53,7 +54,7 @@ static class OptionsParser
         // If the user supplied only a path but no feature flags, show help instead
         // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
         // compress-folders, pdf-to-cbz and the standalone log commands.
-        if (directoryArg is not null && !(addDuplicates || genreToTags || detectUpscale || detectDuplicates || compressFolders || convertToWebp || removeOldCbz || pdfToCbz || clearCache || readLogs || deleteLogs))
+        if (directoryArg is not null && !(addDuplicates || genreToTags || detectUpscale || detectDuplicates || compressFolders || convertToWebp || removeOldCbz || pdfToCbz || cbrToCbz || clearCache || readLogs || deleteLogs))
         {
             PrintHelp(output);
             return null;
@@ -61,7 +62,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, pdfToCbz, parallelism, phashThreshold, clearCache);
+        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -79,6 +80,7 @@ static class OptionsParser
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
         output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
         output.WriteLine("  --pdf-to-cbz             Scan a folder for PDF files and produce a .cbz next to each PDF (non-recursive, skips existing .cbz)");
+        output.WriteLine("  --cbr-to-cbz             Scan a folder recursively for .cbr files and produce a .cbz next to each CBR");
         output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
         output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
         output.WriteLine("  --read-logs               Print all .log files found under the given path to the console");
@@ -98,5 +100,6 @@ static class OptionsParser
         output.WriteLine("  QuickMangaTool.exe C:\\manga --detect-duplicates --phash-threshold=8  Detect duplicates in archives");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --read-logs  Print logs under C:\\manga");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --delete-logs  Delete logs under C:\\manga");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --cbr-to-cbz  Recursively convert .cbr archives to .cbz");
     }
 }

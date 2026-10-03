@@ -10,7 +10,7 @@ class Program
 
         // Only show the dry-run banner when running batch operations —
         // standalone log commands shouldn't print this message.
-        if (options.DryRun && !options.ReadLogs && !options.DeleteLogs && !options.RemoveOldCbz && !options.DetectUpscale)
+        if (options.DryRun && !options.ReadLogs && !options.DeleteLogs && !options.RemoveOldCbz && !options.DetectUpscale && !options.CbrToCbz)
             Console.WriteLine("Dry-run mode: no archives will be modified. Use --confirm or -y to apply changes.");
 
         if (options.ClearCache)
@@ -31,7 +31,7 @@ class Program
 
         // If the selected command is a standalone log or folder-compress command, execute it without
         // requiring discovery of .cbz files or creating a log file.
-        if (options.ReadLogs || options.DeleteLogs || options.CompressFolders || options.AddDuplicates || options.PdfToCbz)
+        if (options.ReadLogs || options.DeleteLogs || options.CompressFolders || options.AddDuplicates || options.PdfToCbz || options.CbrToCbz)
         {
             return command.Execute(Array.Empty<string>(), new NoopRunLogger());
         }
@@ -100,6 +100,9 @@ class Program
 
         if (options.PdfToCbz)
             return new ExtractPdfToCbzCommand(options.Directory);
+
+        if (options.CbrToCbz)
+            return new ConvertCbrToCbzCommand(options.Directory);
 
         // Standalone backup removal: delete all .cbz.old files without converting.
         if (options.RemoveOldCbz && !options.ConvertToWebp)

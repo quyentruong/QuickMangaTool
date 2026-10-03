@@ -173,6 +173,15 @@ public class OptionsParserTests
     }
 
     [Fact]
+    public void CbrToCbzFlag_Long_SetsCbrToCbz()
+    {
+        var options = Parse("--cbr-to-cbz");
+
+        Assert.NotNull(options);
+        Assert.True(options.CbrToCbz);
+    }
+
+    [Fact]
     public void RemoveOldCbzFlag_Long_SetsRemoveOldCbz()
     {
         var options = Parse("--remove-old-cbz");
