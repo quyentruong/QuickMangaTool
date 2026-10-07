@@ -95,11 +95,15 @@ class Program
         if (options.AddDuplicates)
             return new AddDuplicatesCommand(options.Directory, options.DryRun, options.Parallelism);
 
+        IArchiveImageConverter? imageConverter = options.ImageFormat == ImageFormat.Avif
+            ? new AvifArchiveImageConverter()
+            : new WebpArchiveImageConverter();
+
         if (options.CompressFolders)
-            return new CompressFoldersCommand(options.Directory);
+            return new CompressFoldersCommand(options.Directory, imageConverter);
 
         if (options.PdfToCbz)
-            return new ExtractPdfToCbzCommand(options.Directory);
+            return new ExtractPdfToCbzCommand(options.Directory, imageConverter);
 
         if (options.CbrToCbz)
             return new ConvertCbrToCbzCommand(options.Directory);
@@ -114,7 +118,7 @@ class Program
 
         return new BatchTransformCommand(
             new BatchProcessor(
-                new ArchiveProcessor(options.DryRun, transformations, options.ConvertToWebp, options.RemoveOldCbz, options.Parallelism),
+                new ArchiveProcessor(options.DryRun, transformations, options.ConvertToWebp, options.RemoveOldCbz, options.Parallelism, imageConverter),
                 options.Parallelism),
             options.DryRun);
     }

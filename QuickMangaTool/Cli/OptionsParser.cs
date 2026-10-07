@@ -51,6 +51,20 @@ static class OptionsParser
 
         var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-'));
 
+        // Image format (webp or avif). Default is webp.
+        var imageFormat = ImageFormat.Webp;
+        var fArg = args.FirstOrDefault(a => a.StartsWith("--image-format="));
+        if (fArg is not null)
+        {
+            var parts = fArg.Split('=', 2);
+            if (parts.Length == 2)
+            {
+                var v = parts[1].ToLowerInvariant();
+                if (v == "avif") imageFormat = ImageFormat.Avif;
+                else imageFormat = ImageFormat.Webp;
+            }
+        }
+
         // If the user supplied only a path but no feature flags, show help instead
         // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
         // compress-folders, pdf-to-cbz and the standalone log commands.
@@ -62,7 +76,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, clearCache);
+        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, imageFormat, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -78,6 +92,7 @@ static class OptionsParser
         output.WriteLine("  --detect-upscale, -u     Analyze images inside .cbz and report which archives need upscaling");
         output.WriteLine("  --detect-duplicates      Scan .cbz archives and detect duplicate images using duplicates.db and pHash similarity");
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
+        output.WriteLine("  --image-format=webp|avif  Choose output image format when converting or compressing (default: webp)");
         output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
         output.WriteLine("  --pdf-to-cbz             Scan a folder for PDF files and produce a .cbz next to each PDF (non-recursive, skips existing .cbz)");
         output.WriteLine("  --cbr-to-cbz             Scan a folder recursively for .cbr files and produce a .cbz next to each CBR");
@@ -95,6 +110,10 @@ static class OptionsParser
         output.WriteLine("  QuickMangaTool.exe C:\\manga -y  Actually apply changes in C:\\manga");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -n       Dry-run WebP conversion with size diff");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y       Convert images to WebP and keep .old backup");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif -w -y   Convert images to AVIF instead of WebP");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif --compress-folders -y   Compress all subfolders and store images as AVIF");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --pdf-to-cbz --image-format=avif -y   Extract PDFs and convert embedded images to AVIF in produced .cbz files");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --compress-folders -y --parallel=4   Compress folders using 4 workers (tune with --parallel)");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y --remove-old-cbz  Convert and delete .old backup");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --add-duplicates -y  Add image pHash values to duplicates.db");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --detect-duplicates --phash-threshold=8  Detect duplicates in archives");

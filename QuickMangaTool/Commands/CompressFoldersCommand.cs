@@ -11,8 +11,12 @@ using Spectre.Console;
 class CompressFoldersCommand : IAppCommand
 {
     private readonly string _root;
-
-    public CompressFoldersCommand(string root) => _root = root;
+    private readonly IArchiveImageConverter _converter;
+    public CompressFoldersCommand(string root, IArchiveImageConverter? converter = null)
+    {
+        _root = root;
+        _converter = converter ?? new WebpArchiveImageConverter();
+    }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
@@ -76,8 +80,8 @@ class CompressFoldersCommand : IAppCommand
                         raw.Add((f, File.ReadAllBytes(f)));
                     }
 
-                    // Step 2: convert images in parallel using WebpArchiveImageConverter
-                    var converter = new WebpArchiveImageConverter();
+                    // Step 2: convert images in parallel using the configured converter
+                    var converter = _converter;
                     int cpuWorkers = WorkerCount.ResolveCpuBound(0);
                     var converted = new (ConvertedImage? Result, string? Error)[raw.Count];
 
@@ -112,9 +116,9 @@ class CompressFoldersCommand : IAppCommand
                             if (error is not null)
                                 throw new Exception(error);
 
-                            // Choose extension based on stored bytes: .webp when WebP was chosen, otherwise keep the original extension
-                            var ext = result!.WebpWasSmaller ? ".webp" : Path.GetExtension(raw[i].FilePath).ToLowerInvariant();
-                            var entryName = $"{(i + 1):D3}{ext}";
+                            // Choose extension based on stored bytes: use the converter's chosen entry name extension
+                            var chosenExt = Path.GetExtension(result!.EntryName).ToLowerInvariant();
+                            var entryName = $"{(i + 1):D3}{chosenExt}";
 
                             var entry = zip.CreateEntry(entryName, CompressionLevel.NoCompression);
                             using var s = entry.Open();

@@ -5,7 +5,7 @@ A C# .NET 10 command-line utility for bulk processing manga archives in `.cbz` f
 ## Features
 
 - **Genre → Tags migration**: Renames `<Genre>` elements to `<Tags>` in every `ComicInfo.xml` inside each archive, migrating from the old ComicInfo field to the newer standard.
-- **WebP image conversion**: Converts images in `.cbz` archives to WebP format when it results in a smaller file, preserving the original if it is smaller. This optimizes archive size without quality loss. Supported formats: JPG, PNG, BMP, GIF, TIFF, AVIF.
+- **Image conversion (WebP or AVIF)**: Converts images in `.cbz` archives to a chosen output format when it results in a smaller file, preserving the original if it is smaller. The default output format is WebP; AVIF is supported via Magick.NET (see Requirements / notes). Supported input formats: JPG, PNG, BMP, GIF, TIFF, AVIF.
 - **Upscale detection**: Samples images from each archive and flags pages that appear low-resolution, blurry, or noisy using Laplacian variance and Immerkaer noise analysis.
 - **Dry-run by default**: No files are modified unless `--confirm` is explicitly passed.
 - **Skip cache**: Previously processed archives are cached so re-runs skip unchanged files automatically.
@@ -107,10 +107,17 @@ If `path` is omitted, the current directory is used.
 | `--dry-run` | `-n` | Preview changes without modifying any files (default) |
 | `--confirm` | `-y` | Apply changes to `.cbz` files |
 | `--genre-to-tags` | `-g` | Apply the Genre → Tags XML metadata transformation |
-| `--convert-to-webp` | `-w` | Convert images in archives to WebP format when smaller than the original |
+| `--convert-to-webp` | `-w` | Convert images in archives to WebP (or another chosen format) when smaller than the original |
+| `--image-format=webp|avif` | | Choose output image format when converting or compressing (default: `webp`) |
+| `--compress-folders`, `--compress` | | Compress every subfolder under the given path into an individual `.cbz` |
+| `--pdf-to-cbz` | | Extract images from PDFs in a folder and produce `.cbz` files next to each PDF (non-recursive) |
+| `--cbr-to-cbz` | | Recursively convert `.cbr` archives to `.cbz` |
 | `--detect-upscale` | `-u` | Scan archive images for quality issues |
-| `--remove-old-cbz` | | Remove .old backup files after conversion |
-| `--parallel=N` | | Set parallel worker count (default: 2) |
+| `--remove-old-cbz` | | Remove `.old.cbz` backup files after conversion (or run standalone to delete leftover backups) |
+| `--parallel=N` | | Set parallel worker count (default: tuned for system) |
+| `--phash-threshold=N` | | Maximum Hamming distance for pHash duplicate matching (default: 8) |
+| `--read-logs` | | Interactively read `.log` files found under the target path |
+| `--delete-logs` | | Delete `.log` files found under the target path |
 | `--clear-cache` | `-c` | Delete the persistent skip cache and exit |
 
 ### Examples

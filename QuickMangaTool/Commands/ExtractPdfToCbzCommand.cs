@@ -9,8 +9,12 @@ using Spectre.Console;
 class ExtractPdfToCbzCommand : IAppCommand
 {
     private readonly string _root;
-
-    public ExtractPdfToCbzCommand(string root) => _root = root;
+    private readonly IArchiveImageConverter _converter;
+    public ExtractPdfToCbzCommand(string root, IArchiveImageConverter? converter = null)
+    {
+        _root = root;
+        _converter = converter ?? new WebpArchiveImageConverter();
+    }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
@@ -92,7 +96,7 @@ class ExtractPdfToCbzCommand : IAppCommand
         }
 
         // Delegate the actual image conversion and archiving to CompressFoldersCommand
-        var compressExitCode = new CompressFoldersCommand(root).Execute(cbzFiles, logger);
+        var compressExitCode = new CompressFoldersCommand(root, _converter).Execute(cbzFiles, logger);
 
         // Clean up the intermediate extraction folders once their .cbz has been created
         foreach (var folder in extractedFolders)

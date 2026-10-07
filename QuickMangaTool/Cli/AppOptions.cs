@@ -1,3 +1,9 @@
+enum ImageFormat
+{
+    Webp,
+    Avif
+}
+
 record AppOptions(
     string Directory,
     bool DryRun,
@@ -7,6 +13,7 @@ record AppOptions(
     bool DetectDuplicates,
     bool CompressFolders,
     bool ConvertToWebp,
+    ImageFormat ImageFormat,
     bool RemoveOldCbz,
     bool ReadLogs,
     bool DeleteLogs,
