@@ -1,7 +1,8 @@
 enum ImageFormat
 {
     Webp,
-    Avif
+    Avif,
+    Jxl
 }
 
 record AppOptions(
@@ -21,4 +22,5 @@ record AppOptions(
     bool CbrToCbz,
     int Parallelism,
     int PhashThreshold,
+    int? Effort,
     bool ClearCache);

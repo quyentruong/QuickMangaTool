@@ -81,7 +81,7 @@ class ArchiveProcessor : IArchiveProcessor
     private ProcessResult ProcessInPlace(string cbzPath, long originalSize)
     {
         bool changed;
-        (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult;
+        (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures, int BlackWhiteCount, int ColorCount) webpResult;
 
         using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
         {
@@ -149,7 +149,7 @@ class ArchiveProcessor : IArchiveProcessor
         try
         {
             bool changed;
-            (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult;
+            (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures, int BlackWhiteCount, int ColorCount) webpResult;
 
             using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
             {
@@ -236,10 +236,10 @@ class ArchiveProcessor : IArchiveProcessor
         return changed;
     }
 
-    private (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) ConvertImagesToWebp(ZipArchive zip, bool persistChanges)
+    private (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures, int BlackWhiteCount, int ColorCount) ConvertImagesToWebp(ZipArchive zip, bool persistChanges)
     {
         if (!_convertToWebp)
-            return (0, 0, 0, 0, 0, []);
+            return (0, 0, 0, 0, 0, new List<string>(), 0, 0);
 
         var candidates = zip.Entries
             .Where(e => !string.IsNullOrWhiteSpace(e.Name))
@@ -259,9 +259,10 @@ class ArchiveProcessor : IArchiveProcessor
             rawImages.Add((entry.FullName, buffer.ToArray()));
         }
 
-        // Step 2: encode all images to WebP in parallel — CPU-bound work.
+        // Step 2: encode all images in parallel using the selected image converter.
         // The converter decides per image which format is smaller and returns that one.
         int cpuWorkers = WorkerCount.ResolveCpuBound(_parallelism);
+        
         var converted = new (ConvertedImage? Result, string? Error)[rawImages.Count];
 
         Parallel.For(0, rawImages.Count, new ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
@@ -269,6 +270,8 @@ class ArchiveProcessor : IArchiveProcessor
             var (entryName, data) = rawImages[i];
             try
             {
+                if (_imageConverter is AvifArchiveImageConverter)
+                    Console.Error.WriteLine($"Converting: {entryName}");
                 using var ms = new MemoryStream(data);
                 converted[i] = (_imageConverter.Convert(entryName, ms), null);
             }
@@ -279,14 +282,16 @@ class ArchiveProcessor : IArchiveProcessor
         });
 
         // Step 3: write results back to zip sequentially, then count outcomes.
-        // An entry is only replaced when the winning format differs from the original
-        // (i.e. WebP won). When the original is smaller, the entry is left untouched.
+        // An entry is only replaced when the converted format wins the size comparison.
+        // When the original is smaller, the entry is left untouched.
         int webpKeptCount = 0;
         int originalKeptCount = 0;
         long sourceBytes = 0;
         long convertedBytes = 0;
         int failedCount = 0;
         var failures = new List<string>();
+        int blackWhiteCount = 0;
+        int colorCount = 0;
 
         for (int i = 0; i < converted.Length; i++)
         {
@@ -303,35 +308,41 @@ class ArchiveProcessor : IArchiveProcessor
             sourceBytes += result!.SourceBytes;
             convertedBytes += result.ConvertedBytes;
 
-            if (result.WebpWasSmaller)
+            if (result.IsSmaller)
                 webpKeptCount++;
             else
                 originalKeptCount++;
 
+            if (result.IsBlackAndWhite)
+                blackWhiteCount++;
+            else
+                colorCount++;
+
             if (!persistChanges)
                 continue;
 
-            if (!result.WebpWasSmaller)
+            if (!result.IsSmaller)
                 continue; // original is already in the archive, no write needed
 
-            // WebP is smaller: replace the original entry with the WebP one
+            // Converted output is smaller: replace the original entry with the converted one.
             var originalEntry = zip.GetEntry(rawImages[i].EntryName);
             originalEntry?.Delete();
             using var output = zip.CreateEntry(result.EntryName, CompressionLevel.Optimal).Open();
             output.Write(result.Content, 0, result.Content.Length);
         }
 
-        return (webpKeptCount, originalKeptCount, sourceBytes, convertedBytes, failedCount, failures);
+        return (webpKeptCount, originalKeptCount, sourceBytes, convertedBytes, failedCount, failures, blackWhiteCount, colorCount);
     }
 
-    private static string BuildDetail((int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult, long originalSize, long? newSize)
+    private static string BuildDetail((int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures, int BlackWhiteCount, int ColorCount) webpResult, long originalSize, long? newSize)
     {
         var lines = new List<string>();
         int totalProcessed = webpResult.WebpKeptCount + webpResult.OriginalKeptCount;
 
         if (totalProcessed > 0)
         {
-            lines.Add($"Images processed: {totalProcessed}  (WebP kept: {webpResult.WebpKeptCount}  ·  Original kept (smaller): {webpResult.OriginalKeptCount})");
+            lines.Add($"Images processed: {totalProcessed}  (Converted kept: {webpResult.WebpKeptCount}  ·  Original kept (smaller): {webpResult.OriginalKeptCount})");
+            lines.Add($"Black & White: {webpResult.BlackWhiteCount}  ·  Color: {webpResult.ColorCount}");
             lines.Add($"Original size:    {SizeFormatter.FormatSize(originalSize)}");
 
             if (newSize is not null)

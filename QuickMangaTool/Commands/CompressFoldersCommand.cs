@@ -93,7 +93,7 @@ class CompressFoldersCommand : IAppCommand
                             if (!converter.CanConvert(fileName))
                             {
                                 // Return the original bytes when the converter doesn't support this extension
-                                converted[i] = (new ConvertedImage(fileName, raw[i].Data, raw[i].Data.Length, 0, WebpWasSmaller: false), null);
+                                converted[i] = (new ConvertedImage(fileName, raw[i].Data, raw[i].Data.Length, 0, IsSmaller: false, IsBlackAndWhite: false), null);
                             }
                             else
                             {
@@ -125,9 +125,17 @@ class CompressFoldersCommand : IAppCommand
                             s.Write(result.Content, 0, result.Content.Length);
                         }
                     }
+                        int bwCount = 0;
+                        int colorCount = 0;
+                        foreach (var (res, err) in converted)
+                        {
+                            if (res is null) continue;
+                            if (res.IsBlackAndWhite) bwCount++; else colorCount++;
+                        }
 
-                    var success = new ProcessResult(target, ProcessStatus.Updated);
-                    logger.WriteEntry(success);
+                        var detail = $"Black & White: {bwCount}  ·  Color: {colorCount}";
+                        var success = new ProcessResult(target, ProcessStatus.Updated, Detail: detail);
+                        logger.WriteEntry(success);
                     created++;
                 }
                 catch (Exception ex)

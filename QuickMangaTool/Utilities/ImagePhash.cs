@@ -1,6 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using NetVips;
 
 static class ImagePhash
 {
@@ -9,28 +7,27 @@ static class ImagePhash
 
     public static ulong ComputeHash(Stream stream)
     {
-        using var image = Image.Load<L8>(stream);
-        image.Mutate(x => x.Resize(new ResizeOptions
+        var sourceData = StreamByteReader.Read(stream, out _);
+        using var image = Image.NewFromBuffer(sourceData, kwargs: new VOption
         {
-            Size = new Size(ResizeSize, ResizeSize),
-            Sampler = KnownResamplers.Bicubic,
-            Mode = ResizeMode.Stretch
-        }));
-
-        var values = new double[ResizeSize, ResizeSize];
-        image.ProcessPixelRows(accessor =>
-        {
-            for (int y = 0; y < ResizeSize; y++)
-            {
-                var row = accessor.GetRowSpan(y);
-                for (int x = 0; x < ResizeSize; x++)
-                {
-                    values[y, x] = row[x].PackedValue;
-                }
-            }
+            {"access", Enums.Access.Sequential}
         });
 
-        var dct = ComputeDct(values);
+        using var mono = image.Colourspace(Enums.Interpretation.Bw).Cast(Enums.BandFormat.Uchar);
+        using var resized = mono.Resize((double)ResizeSize / Math.Max(mono.Width, mono.Height));
+        using var square = resized.Embed(0, 0, ResizeSize, ResizeSize, extend: Enums.Extend.Black);
+        var values = square.WriteToMemory<byte>();
+
+        var matrix = new double[ResizeSize, ResizeSize];
+        for (var y = 0; y < ResizeSize; y++)
+        {
+            for (var x = 0; x < ResizeSize; x++)
+            {
+                matrix[y, x] = values[y * ResizeSize + x];
+            }
+        }
+
+        var dct = ComputeDct(matrix);
 
         var coefficients = new List<double>(HashSize * HashSize - 1);
         for (int y = 0; y < HashSize; y++)

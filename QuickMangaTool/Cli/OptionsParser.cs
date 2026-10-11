@@ -47,11 +47,19 @@ static class OptionsParser
                 parallelism = pv;
         }
 
+        int? effort = null;
+        var effortArg = args.FirstOrDefault(a => a.StartsWith("--effort="));
+        if (effortArg is not null)
+        {
+            var parts = effortArg.Split('=', 2);
+            if (parts.Length == 2 && int.TryParse(parts[1], out var ev) && ev >= 0)
+                effort = ev;
+        }
         var clearCache = args.Contains("--clear-cache") || args.Contains("-c");
 
         var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-'));
 
-        // Image format (webp or avif). Default is webp.
+        // Image format (webp, avif, or jxl). Default is webp.
         var imageFormat = ImageFormat.Webp;
         var fArg = args.FirstOrDefault(a => a.StartsWith("--image-format="));
         if (fArg is not null)
@@ -61,6 +69,7 @@ static class OptionsParser
             {
                 var v = parts[1].ToLowerInvariant();
                 if (v == "avif") imageFormat = ImageFormat.Avif;
+                else if (v == "jxl") imageFormat = ImageFormat.Jxl;
                 else imageFormat = ImageFormat.Webp;
             }
         }
@@ -76,7 +85,7 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, imageFormat, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, clearCache);
+        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, imageFormat, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, effort, clearCache);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -92,7 +101,8 @@ static class OptionsParser
         output.WriteLine("  --detect-upscale, -u     Analyze images inside .cbz and report which archives need upscaling");
         output.WriteLine("  --detect-duplicates      Scan .cbz archives and detect duplicate images using duplicates.db and pHash similarity");
         output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
-        output.WriteLine("  --image-format=webp|avif  Choose output image format when converting or compressing (default: webp)");
+        output.WriteLine("  --image-format=webp|avif|jxl  Choose output image format when converting or compressing (default: webp)");
+        output.WriteLine("  --effort=N               Set WebP/JPEG XL/AVIF encoder effort level (default: 6 for WebP, 5 for JXL, 3 for AVIF)");
         output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
         output.WriteLine("  --pdf-to-cbz             Scan a folder for PDF files and produce a .cbz next to each PDF (non-recursive, skips existing .cbz)");
         output.WriteLine("  --cbr-to-cbz             Scan a folder recursively for .cbr files and produce a .cbz next to each CBR");
@@ -102,6 +112,7 @@ static class OptionsParser
         output.WriteLine("  --delete-logs             Delete all .log files found under the given path");
         output.WriteLine("  --parallel=N             Set parallel worker count for detection (default = tuned for disk)");
         output.WriteLine("  --phash-threshold=N      Maximum Hamming distance for pHash duplicate matching (default: 8)");
+        // --avif-effort removed; AVIF uses the shared --effort flag now.
         output.WriteLine("  --clear-cache, -c        Remove the cached list of previously-clean archives and exit");
         output.WriteLine();
         output.WriteLine("Examples:");
@@ -110,7 +121,9 @@ static class OptionsParser
         output.WriteLine("  QuickMangaTool.exe C:\\manga -y  Actually apply changes in C:\\manga");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -n       Dry-run WebP conversion with size diff");
         output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y       Convert images to WebP and keep .old backup");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=jxl --effort=7 -w -y   Convert images to JPEG XL with higher encoder effort");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif -w -y   Convert images to AVIF instead of WebP");
+        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif --effort=6 -w -y   Convert images to AVIF with higher encoder effort");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif --compress-folders -y   Compress all subfolders and store images as AVIF");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --pdf-to-cbz --image-format=avif -y   Extract PDFs and convert embedded images to AVIF in produced .cbz files");
         output.WriteLine("  QuickMangaTool.exe C:\\manga --compress-folders -y --parallel=4   Compress folders using 4 workers (tune with --parallel)");

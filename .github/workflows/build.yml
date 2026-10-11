@@ -21,6 +21,12 @@ jobs:
       with:
         dotnet-version: '10.0.x'
 
+    - name: Install libvips
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libvips libvips-dev libvips-tools
+
     - name: Restore dependencies
       run: dotnet restore QuickMangaTool/QuickMangaTool.csproj
 

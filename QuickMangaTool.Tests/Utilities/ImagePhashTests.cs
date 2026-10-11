@@ -1,5 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using NetVips;
 
 namespace QuickMangaTool.Tests.Utilities;
 
@@ -11,13 +10,13 @@ public class ImagePhashTests
     [Fact]
     public void ComputeHash_SameImageData_ReturnsSameHash()
     {
-        using var image = new Image<Rgba32>(32, 32, Color.White);
+        using var image = Image.Black(32, 32) + 255;
 
         using var stream1 = new MemoryStream();
         using var stream2 = new MemoryStream();
 
-        image.SaveAsPng(stream1);
-        image.SaveAsPng(stream2);
+        image.WriteToStream(stream1, ".png");
+        image.WriteToStream(stream2, ".png");
 
         stream1.Position = 0;
         stream2.Position = 0;
@@ -31,14 +30,14 @@ public class ImagePhashTests
     [Fact]
     public void ComputeHash_DifferentImages_ReturnsDifferentHash()
     {
-        using var whiteImage = new Image<Rgba32>(32, 32, Color.White);
-        using var blackImage = new Image<Rgba32>(32, 32, Color.Black);
+        using var whiteImage = Image.Black(32, 32) + 255;
+        using var blackImage = Image.Black(32, 32);
 
         using var whiteStream = new MemoryStream();
         using var blackStream = new MemoryStream();
 
-        whiteImage.SaveAsPng(whiteStream);
-        blackImage.SaveAsPng(blackStream);
+        whiteImage.WriteToStream(whiteStream, ".png");
+        blackImage.WriteToStream(blackStream, ".png");
 
         whiteStream.Position = 0;
         blackStream.Position = 0;

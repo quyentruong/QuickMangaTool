@@ -1,6 +1,4 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
+using NetVips;
 
 namespace QuickMangaTool.Tests.Processing.Images;
 
@@ -51,7 +49,7 @@ public class WebpArchiveImageConverterTests
 
         var result = _sut.Convert("page.png", stream);
 
-        if (result.WebpWasSmaller)
+        if (result.IsSmaller)
             Assert.Equal("page.webp", result.EntryName);
         else
             Assert.Equal("page.png", result.EntryName);
@@ -94,18 +92,18 @@ public class WebpArchiveImageConverterTests
         var result = _sut.Convert("page.png", stream);
 
         // Content must be exactly the bytes that correspond to the winner.
-        Assert.Equal(result.Content.Length, result.WebpWasSmaller ? result.ConvertedBytes : result.SourceBytes);
+        Assert.Equal(result.Content.Length, result.IsSmaller ? result.ConvertedBytes : result.SourceBytes);
     }
 
     [Fact]
-    public void Convert_WebpWasSmaller_WhenConvertedBytesLessThanSourceBytes()
+    public void Convert_IsSmaller_WhenConvertedBytesLessThanSourceBytes()
     {
         using var stream = CreateLargeCompressiblePng();
 
         var result = _sut.Convert("page.png", stream);
 
         // The flag must be consistent with the actual byte counts.
-        Assert.Equal(result.ConvertedBytes < result.SourceBytes, result.WebpWasSmaller);
+        Assert.Equal(result.ConvertedBytes < result.SourceBytes, result.IsSmaller);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -113,9 +111,9 @@ public class WebpArchiveImageConverterTests
     /// <summary>Creates a PNG stream that is large and highly compressible (solid colour).</summary>
     private static MemoryStream CreateLargeCompressiblePng()
     {
-        using var image = new Image<Rgba32>(512, 512, new Rgba32(100, 149, 237));
+        using var image = (Image.Black(512, 512) + new[] { 100.0, 149.0, 237.0 }).Cast(Enums.BandFormat.Uchar);
         var ms = new MemoryStream();
-        image.Save(ms, new PngEncoder());
+        image.WriteToStream(ms, ".png");
         ms.Position = 0;
         return ms;
     }
@@ -123,9 +121,9 @@ public class WebpArchiveImageConverterTests
     /// <summary>Creates a minimal 1×1 PNG stream (already tiny; unlikely to produce a smaller WebP).</summary>
     private static MemoryStream CreateTinyPng()
     {
-        using var image = new Image<Rgba32>(1, 1, new Rgba32(255, 0, 0));
+        using var image = (Image.Black(1, 1) + new[] { 255.0, 0.0, 0.0 }).Cast(Enums.BandFormat.Uchar);
         var ms = new MemoryStream();
-        image.Save(ms, new PngEncoder());
+        image.WriteToStream(ms, ".png");
         ms.Position = 0;
         return ms;
     }

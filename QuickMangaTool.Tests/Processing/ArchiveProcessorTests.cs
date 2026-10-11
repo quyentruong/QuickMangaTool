@@ -55,8 +55,8 @@ public class ArchiveProcessorTests : IDisposable
         var mockConv = new Moq.Mock<IArchiveImageConverter>();
         mockConv.Setup(m => m.CanConvert(It.IsAny<string>())).Returns(true);
         mockConv.Setup(m => m.Convert(It.IsAny<string>(), It.IsAny<Stream>()))
-            .Returns((string entryName, Stream s) =>
-                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, WebpWasSmaller: true));
+                .Returns((string entryName, Stream s) =>
+                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, IsSmaller: true, IsBlackAndWhite: false));
 
         var ap = new ArchiveProcessor(
             dryRun: false,
@@ -86,7 +86,7 @@ public class ArchiveProcessorTests : IDisposable
         mockConv.Setup(m => m.CanConvert(It.IsAny<string>())).Returns(true);
         mockConv.Setup(m => m.Convert(It.IsAny<string>(), It.IsAny<Stream>()))
             .Returns((string entryName, Stream s) =>
-                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, WebpWasSmaller: true));
+                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, IsSmaller: true, IsBlackAndWhite: false));
 
         var ap = new ArchiveProcessor(
             dryRun: false,
@@ -206,7 +206,7 @@ public class ArchiveProcessorTests : IDisposable
         mockConv.Setup(m => m.CanConvert(It.IsAny<string>())).Returns(true);
         mockConv.Setup(m => m.Convert(It.IsAny<string>(), It.IsAny<Stream>()))
             .Returns((string entryName, Stream s) =>
-                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, WebpWasSmaller: true));
+                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, IsSmaller: true, IsBlackAndWhite: false));
 
         var ap = new ArchiveProcessor(
             dryRun: true,
@@ -325,7 +325,7 @@ public class ArchiveProcessorTests : IDisposable
         mockConv.Setup(m => m.CanConvert(It.IsAny<string>())).Returns(true);
         mockConv.Setup(m => m.Convert(It.IsAny<string>(), It.IsAny<Stream>()))
             .Returns((string entryName, Stream s) =>
-                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), new byte[] { 9 }, original.Length, 1, WebpWasSmaller: false));
+                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), new byte[] { 9 }, original.Length, 1, IsSmaller: false, IsBlackAndWhite: false));
 
         var ap = new ArchiveProcessor(
             dryRun: false,
@@ -381,7 +381,7 @@ public class ArchiveProcessorTests : IDisposable
         mockConv.Setup(m => m.CanConvert(It.IsAny<string>())).Returns(true);
         mockConv.Setup(m => m.Convert(It.IsAny<string>(), It.IsAny<Stream>()))
             .Returns((string entryName, Stream s) =>
-                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, WebpWasSmaller: true));
+                new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), webp, original.Length, webp.Length, IsSmaller: true, IsBlackAndWhite: false));
 
         var ap = new ArchiveProcessor(
             dryRun: false,
@@ -413,7 +413,7 @@ public class ArchiveProcessorTests : IDisposable
             {
                 call++;
                 if (call == 1)
-                    return new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), new byte[] { 9 }, original.Length, 1, WebpWasSmaller: true);
+                    return new ConvertedImage(Path.ChangeExtension(entryName, ".webp"), new byte[] { 9 }, original.Length, 1, IsSmaller: true, IsBlackAndWhite: false);
                 throw new InvalidOperationException("update-convert-boom");
             });
 

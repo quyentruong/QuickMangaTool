@@ -5,7 +5,7 @@ A C# .NET 10 command-line utility for bulk processing manga archives in `.cbz` f
 ## Features
 
 - **Genre → Tags migration**: Renames `<Genre>` elements to `<Tags>` in every `ComicInfo.xml` inside each archive, migrating from the old ComicInfo field to the newer standard.
-- **Image conversion (WebP or AVIF)**: Converts images in `.cbz` archives to a chosen output format when it results in a smaller file, preserving the original if it is smaller. The default output format is WebP; AVIF is supported via Magick.NET (see Requirements / notes). Supported input formats: JPG, PNG, BMP, GIF, TIFF, AVIF.
+- **Image conversion (WebP, AVIF, or JPEG XL)**: Converts images in `.cbz` archives to a chosen output format when it results in a smaller file, preserving the original if it is smaller. The default output format is WebP; WebP, JPEG XL, and AVIF all use the shared `--effort` setting (higher values are slower but can compress better). Supported input formats: JPG, PNG, BMP, GIF, TIFF, AVIF.
 - **Upscale detection**: Samples images from each archive and flags pages that appear low-resolution, blurry, or noisy using Laplacian variance and Immerkaer noise analysis.
 - **Dry-run by default**: No files are modified unless `--confirm` is explicitly passed.
 - **Skip cache**: Previously processed archives are cached so re-runs skip unchanged files automatically.
@@ -108,7 +108,8 @@ If `path` is omitted, the current directory is used.
 | `--confirm` | `-y` | Apply changes to `.cbz` files |
 | `--genre-to-tags` | `-g` | Apply the Genre → Tags XML metadata transformation |
 | `--convert-to-webp` | `-w` | Convert images in archives to WebP (or another chosen format) when smaller than the original |
-| `--image-format=webp|avif` | | Choose output image format when converting or compressing (default: `webp`) |
+| `--image-format=webp|avif|jxl` | | Choose output image format when converting or compressing (default: `webp`) |
+| `--effort=N` | | Set WebP/JPEG XL/AVIF encoder effort when `--image-format=webp|jxl|avif` is selected (default: `6` for WebP, `5` for JXL, `3` for AVIF) |
 | `--compress-folders`, `--compress` | | Compress every subfolder under the given path into an individual `.cbz` |
 | `--pdf-to-cbz` | | Extract images from PDFs in a folder and produce `.cbz` files next to each PDF (non-recursive) |
 | `--cbr-to-cbz` | | Recursively convert `.cbr` archives to `.cbz` |
@@ -141,6 +142,12 @@ QuickMangaTool.exe C:\manga -g -u -y
 # Clear the skip cache
 QuickMangaTool.exe --clear-cache
 
+# Convert images to AVIF with a higher encoder effort
+QuickMangaTool.exe C:\manga --image-format=avif --effort=6 -w -y
+
+# Convert images to JPEG XL with a higher encoder effort
+QuickMangaTool.exe C:\manga --image-format=jxl --effort=7 -w -y
+
 # Convert all PDFs in a folder to CBZ (non-recursive). For each `sample.pdf` the tool
 # will create `sample.cbz` next to the PDF, skipping any PDFs that already have a
 # corresponding `.cbz` file.
@@ -149,9 +156,11 @@ QuickMangaTool.exe /path/to/folder --pdf-to-cbz
 
 ## Commands
 
-### WebP Image Conversion (`--convert-webp`)
+### Image Conversion (`--convert-to-webp`)
 
-Finds all supported images (JPG, PNG, BMP, GIF, TIFF, AVIF) in each `.cbz` archive and converts them to WebP format if the resulting file is smaller. If the original image is smaller, it is kept instead. This process helps reduce archive size without sacrificing image quality. The final archive may contain a mix of original and WebP images, depending on which format is smaller for each entry.
+Finds all supported images (JPG, PNG, BMP, GIF, TIFF, AVIF) in each `.cbz` archive and converts them to the selected output format if the resulting file is smaller. If the original image is smaller, it is kept instead. This process helps reduce archive size without sacrificing image quality. The final archive may contain a mix of original and converted images, depending on which format is smaller for each entry.
+
+When `--image-format=avif` is selected, `--effort=N` controls the AVIF encoder effort level. Higher values usually compress slightly better but take longer to encode.
 
 In dry-run mode, reports how many images *would* be converted without writing to disk.
 
@@ -182,3 +191,4 @@ Stored at `~/.quickmangatool/skipcache.dat`. Each entry records the archive path
 
 - .NET 10 runtime
 - Windows or Linux (x64)
+ - libvips (native) — required when using NetVips for WebP/AVIF conversion. See [docs/libvips.md](docs/libvips.md) for installation and CI instructions.

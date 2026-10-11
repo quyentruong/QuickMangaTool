@@ -173,6 +173,69 @@ public class OptionsParserTests
     }
 
     [Fact]
+    public void EffortFlag_ParsesValue()
+    {
+        var options = Parse("--image-format=webp", "--effort=9", "-w");
+
+        Assert.NotNull(options);
+        Assert.Equal(9, options.Effort);
+    }
+
+    [Fact]
+    public void EffortFlag_InvalidValue_IsIgnored()
+    {
+        var options = Parse("--image-format=webp", "--effort=abc", "-w");
+
+        Assert.NotNull(options);
+        Assert.Null(options.Effort);
+    }
+
+    [Fact]
+    public void EffortFlag_ParsesValue_ForJxl()
+    {
+        var options = Parse("--image-format=jxl", "--effort=7", "-w");
+
+        Assert.NotNull(options);
+        Assert.Equal(7, options.Effort);
+    }
+
+    [Fact]
+    public void EffortFlag_InvalidValue_ForJxl_IsIgnored()
+    {
+        var options = Parse("--image-format=jxl", "--effort=abc", "-w");
+
+        Assert.NotNull(options);
+        Assert.Null(options.Effort);
+    }
+
+    [Fact]
+    public void EffortFlag_ParsesValue_ForAvif()
+    {
+        var options = Parse("--image-format=avif", "--effort=6", "-w");
+
+        Assert.NotNull(options);
+        Assert.Equal(6, options.Effort);
+    }
+
+    [Fact]
+    public void EffortFlag_InvalidValue_ForAvif_IsIgnored()
+    {
+        var options = Parse("--image-format=avif", "--effort=abc", "-w");
+
+        Assert.NotNull(options);
+        Assert.Null(options.Effort);
+    }
+
+    [Fact]
+    public void ImageFormatFlag_Jxl_SetsImageFormat()
+    {
+        var options = Parse("--image-format=jxl", "-w");
+
+        Assert.NotNull(options);
+        Assert.Equal(ImageFormat.Jxl, options.ImageFormat);
+    }
+
+    [Fact]
     public void CbrToCbzFlag_Long_SetsCbrToCbz()
     {
         var options = Parse("--cbr-to-cbz");
