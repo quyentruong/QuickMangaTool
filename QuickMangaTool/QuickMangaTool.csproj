@@ -26,8 +26,8 @@
   <ItemGroup>
     <PackageReference Include="NetVips" Version="3.2.0" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
-    <PackageReference Include="SharpCompress" Version="0.50.3" />
-    <PackageReference Include="Spectre.Console" Version="0.44.0" />
+    <PackageReference Include="SharpCompress" Version="0.50.8" />
+    <PackageReference Include="Spectre.Console" Version="0.57.2" />
   </ItemGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

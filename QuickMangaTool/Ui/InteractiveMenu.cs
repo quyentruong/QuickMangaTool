@@ -5,7 +5,7 @@ static class InteractiveMenu
     public static AppOptions? Run(string initialDirectory)
     {
         AnsiConsole.Clear();
-        AnsiConsole.Write(new Rule("[bold cyan]QuickMangaTool[/]").LeftAligned());
+        AnsiConsole.Write(new Rule("[bold cyan]QuickMangaTool[/]").LeftJustified());
         AnsiConsole.WriteLine();
 
         var dir = AnsiConsole.Prompt(
