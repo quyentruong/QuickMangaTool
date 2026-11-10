@@ -1,25 +1,62 @@
+using Spectre.Console;
+
 class Program
 {
     static int Main(string[] args)
     {
-        AppOptions? options = null;
+        bool isInteractive = args.Contains("--interactive") || args.Contains("-i") ||
+            (!Console.IsInputRedirected && (args.Length == 0 || (args.Length == 1 && !args[0].StartsWith('-'))));
 
-        // If interactive flag passed explicitly, or if run without flags in an interactive console
-        if (args.Contains("--interactive") || args.Contains("-i") ||
-            (!Console.IsInputRedirected && (args.Length == 0 || (args.Length == 1 && !args[0].StartsWith('-')))))
+        if (isInteractive)
         {
-            var initialDir = args.FirstOrDefault(a => !a.StartsWith('-')) ?? Directory.GetCurrentDirectory();
-            options = InteractiveMenu.Run(initialDir);
-            if (options is null)
-                return 0;
-        }
-        else
-        {
-            options = OptionsParser.Parse(args, Console.Out);
-            if (options is null)
-                return 0;
+            return RunInteractiveLoop(args);
         }
 
+        return RunCli(args);
+    }
+
+    private static int RunInteractiveLoop(string[] args)
+    {
+        var initialDir = args.FirstOrDefault(a => !a.StartsWith('-'));
+        var currentDir = !string.IsNullOrWhiteSpace(initialDir) && Directory.Exists(initialDir)
+            ? Path.GetFullPath(initialDir)
+            : (LastLocationStore.GetLastDirectory() ?? Directory.GetCurrentDirectory());
+
+        currentDir = Path.GetFullPath(currentDir);
+        LastLocationStore.SaveLastDirectory(currentDir);
+
+        while (true)
+        {
+            var options = InteractiveMenu.PromptOperation(ref currentDir);
+            if (options is null)
+                return 0;
+
+            try
+            {
+                ExecuteOptions(options);
+            }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]Lỗi thực thi: {Markup.Escape(ex.Message)}[/]");
+            }
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[dim]Bấm phím bất kỳ để quay lại menu chính...[/]");
+            Console.ReadKey(true);
+        }
+    }
+
+    private static int RunCli(string[] args)
+    {
+        var options = OptionsParser.Parse(args, Console.Out);
+        if (options is null)
+            return 0;
+
+        return ExecuteOptions(options);
+    }
+
+    private static int ExecuteOptions(AppOptions options)
+    {
         if (options.ClearCache)
         {
             SkipCache.Clear();
@@ -32,21 +69,21 @@ class Program
             Console.WriteLine("Dry-run mode: no archives will be modified. Re-run without --dry-run or -n to apply changes.");
         }
 
-        if (!Directory.Exists(options.Directory))
-        {
-            Console.Error.WriteLine($"Directory not found: {options.Directory}");
-            return 1;
-        }
+        // Standalone commands that do not produce batch log files and don't strictly require target directory to exist
+        if (options.VipsDiagnostics)
+            return new VipsDiagnosticCommand().Execute(Array.Empty<string>(), new NoopRunLogger());
 
-        // Standalone commands that do not produce batch log files
         if (options.ReadLogs)
             return new ReadLogsCommand(options.Directory).Execute(Array.Empty<string>(), new NoopRunLogger());
 
         if (options.DeleteLogs)
             return new DeleteLogsCommand(options.Directory, options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
 
-        if (options.VipsDiagnostics)
-            return new VipsDiagnosticCommand().Execute(Array.Empty<string>(), new NoopRunLogger());
+        if (!Directory.Exists(options.Directory))
+        {
+            Console.Error.WriteLine($"Directory not found: {options.Directory}");
+            return 1;
+        }
 
         IArchiveImageConverter imageConverter = options.ImageFormat switch
         {

@@ -12,12 +12,47 @@ class ReadLogsCommand : IAppCommand
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        var logFiles = Directory.EnumerateFiles(_root, "*.log", SearchOption.AllDirectories)
-            .Select(f => new { Path = f, Timestamp = ParseTimestampFromFilename(f) })
+        var foundPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var logEntries = new List<(string Path, DateTime? Timestamp)>();
+
+        void ScanDir(string dir)
+        {
+            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
+                return;
+
+            try
+            {
+                foreach (var f in Directory.EnumerateFiles(dir, "*.log", SearchOption.AllDirectories))
+                {
+                    if (foundPaths.Add(f))
+                    {
+                        logEntries.Add((f, ParseTimestampFromFilename(f)));
+                    }
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
+        ScanDir(_root);
+        var exeDir = AppContext.BaseDirectory;
+        if (!string.IsNullOrWhiteSpace(exeDir))
+        {
+            try
+            {
+                if (!string.Equals(Path.GetFullPath(exeDir), Path.GetFullPath(_root), StringComparison.OrdinalIgnoreCase))
+                {
+                    ScanDir(exeDir);
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
+        var logFiles = logEntries
             .OrderBy(x => x.Timestamp ?? DateTime.MinValue)
             .ThenBy(x => x.Path)
             .Select(x => x.Path)
             .ToList();
+
         if (logFiles.Count == 0)
         {
             Console.WriteLine("No .log files found.");
