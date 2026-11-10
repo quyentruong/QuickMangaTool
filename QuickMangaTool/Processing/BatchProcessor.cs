@@ -17,22 +17,16 @@ class BatchProcessor : IBatchProcessor
         int updatedCount = 0;
         int wouldUpdateCount = 0;
         int workers = WorkerCount.Resolve(_parallelism);
-        //const int descriptionWidth = 100;
 
-        // Channel for completed results; the per-worker ProgressTasks handle in-progress display.
         using var results = new BlockingCollection<ProcessResult>();
 
         ProgressFactory.Create().Start(ctx =>
         {
-            // One overall progress task that advances once per completed file.
-            // Description shows a simple [done/total] counter so the label is always accurate.
             int completedCount = 0;
             var overallTask = ctx.AddTask(
-                Markup.Escape($"[0 / {files.Count} files]"),
+                Markup.Escape($"Overall progress [0 / {files.Count} files]"),
                 maxValue: files.Count);
 
-            // One ProgressTask per worker slot — each shows which file that slot is processing.
-            // Marked IsIndeterminate so the progress bar animates instead of showing a stuck 0%.
             var workerTasks = Enumerable.Range(0, workers)
                 .Select(i =>
                 {
@@ -42,7 +36,6 @@ class BatchProcessor : IBatchProcessor
                 })
                 .ToArray();
 
-            // Pool of available worker slot indices — dequeued when a file starts, re-enqueued when it finishes.
             var slotPool = new ConcurrentQueue<int>(Enumerable.Range(0, workers));
 
             var producer = Task.Run(() =>
@@ -50,14 +43,21 @@ class BatchProcessor : IBatchProcessor
                 var po = new ParallelOptions { MaxDegreeOfParallelism = workers };
                 Parallel.ForEach(files, po, cbz =>
                 {
-                    // Claim a worker slot and show the file being converted on that slot's row.
                     slotPool.TryDequeue(out int slot);
-                    workerTasks[slot].Description =
-                        Markup.Escape($"Worker {slot + 1}: Converting: {Path.GetFileName(cbz)}");
+                    var fileName = Path.GetFileName(cbz);
+                    workerTasks[slot].Description = Markup.Escape($"Worker {slot + 1}: {fileName}");
+                    workerTasks[slot].IsIndeterminate = true;
 
                     try
                     {
-                        results.Add(_archiveProcessor.Process(cbz));
+                        var res = _archiveProcessor.Process(cbz, (current, total) =>
+                        {
+                            workerTasks[slot].IsIndeterminate = false;
+                            workerTasks[slot].MaxValue = total;
+                            workerTasks[slot].Value = current;
+                            workerTasks[slot].Description = Markup.Escape($"Worker {slot + 1}: {fileName} [{current}/{total}]");
+                        });
+                        results.Add(res);
                     }
                     catch (Exception ex)
                     {
@@ -65,9 +65,8 @@ class BatchProcessor : IBatchProcessor
                     }
                     finally
                     {
-                        // Reset the slot's label and return it to the pool for the next file.
-                        workerTasks[slot].Description =
-                            Markup.Escape($"Worker {slot + 1}: Idle");
+                        workerTasks[slot].Description = Markup.Escape($"Worker {slot + 1}: Idle");
+                        workerTasks[slot].IsIndeterminate = true;
                         slotPool.Enqueue(slot);
                     }
                 });
@@ -75,7 +74,6 @@ class BatchProcessor : IBatchProcessor
                 results.CompleteAdding();
             });
 
-            // Consume completed results: log the outcome and advance the overall progress bar.
             foreach (var result in results.GetConsumingEnumerable())
             {
                 logger.WriteEntry(result);
@@ -87,7 +85,7 @@ class BatchProcessor : IBatchProcessor
                 }
 
                 completedCount++;
-                overallTask.Description = Markup.Escape($"[{completedCount} / {files.Count} files]");
+                overallTask.Description = Markup.Escape($"Overall progress [{completedCount} / {files.Count} files]");
                 overallTask.Increment(1);
             }
 

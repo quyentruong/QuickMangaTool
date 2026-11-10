@@ -2,23 +2,53 @@ using Spectre.Console;
 
 /// <summary>
 /// Standalone command that deletes all <c>.old.cbz</c> backup files left behind
-/// by a previous <c>--convert-to-webp</c> run.
+/// by a previous conversion run.
 /// </summary>
 class RemoveOldCbzCommand : IAppCommand
 {
+    private readonly string? _root;
+    private readonly bool _confirm;
+
+    public RemoveOldCbzCommand(string? root = null, bool confirm = false)
+    {
+        _root = root;
+        _confirm = confirm;
+    }
+
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        // Derive .old.cbz paths from the discovered .cbz files so the search root is reused
-        var oldFiles = cbzFiles
-            .Select(f => Path.Combine(
-                Path.GetDirectoryName(f) ?? string.Empty,
-                Path.GetFileNameWithoutExtension(f) + ".old" + Path.GetExtension(f)))
-            .Where(File.Exists)
-            .ToList();
+        var oldFilesSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(_root) && Directory.Exists(_root))
+        {
+            foreach (var f in Directory.EnumerateFiles(_root, "*.old.cbz", SearchOption.AllDirectories))
+                oldFilesSet.Add(f);
+
+            foreach (var f in Directory.EnumerateFiles(_root, "*.cbz.old", SearchOption.AllDirectories))
+                oldFilesSet.Add(f);
+        }
+
+        if (cbzFiles != null)
+        {
+            foreach (var f in cbzFiles)
+            {
+                var dir = Path.GetDirectoryName(f) ?? string.Empty;
+                var baseName = Path.GetFileNameWithoutExtension(f);
+                var ext = Path.GetExtension(f);
+
+                var p1 = Path.Combine(dir, baseName + ".old" + ext);
+                if (File.Exists(p1)) oldFilesSet.Add(p1);
+
+                var p2 = Path.Combine(dir, Path.GetFileName(f) + ".old");
+                if (File.Exists(p2)) oldFilesSet.Add(p2);
+            }
+        }
+
+        var oldFiles = oldFilesSet.Where(File.Exists).OrderBy(x => x).ToList();
 
         if (oldFiles.Count == 0)
         {
-            Console.WriteLine("No .cbz.old backup files found.");
+            Console.WriteLine("No .old.cbz backup files found.");
             return 0;
         }
 
@@ -28,12 +58,15 @@ class RemoveOldCbzCommand : IAppCommand
             Console.WriteLine(f);
         }
 
-        Console.Write($"Delete these {oldFiles.Count} file(s)? (y/N): ");
-        var answer = Console.ReadLine();
-        if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+        if (!_confirm)
         {
-            Console.WriteLine("Aborted. No files deleted.");
-            return 0;
+            Console.Write($"Delete these {oldFiles.Count} file(s)? (y/N): ");
+            var answer = Console.ReadLine();
+            if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Aborted. No files deleted.");
+                return 0;
+            }
         }
 
         int deleted = 0;
@@ -42,7 +75,6 @@ class RemoveOldCbzCommand : IAppCommand
         ProgressFactory.Create().Start(ctx =>
         {
             var task = ctx.AddTask("Removing .old.cbz backups", maxValue: oldFiles.Count);
-            const int descriptionWidth = 100;
 
             foreach (var oldFile in oldFiles)
             {
@@ -62,8 +94,7 @@ class RemoveOldCbzCommand : IAppCommand
                 logger.WriteEntry(result);
                 task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(
                     result.Status == ProcessStatus.Error ? "Error" : "Deleted",
-                    result.FilePath,
-                    descriptionWidth));
+                    oldFile));
                 task.Increment(1);
             }
         });

@@ -12,10 +12,19 @@ class CompressFoldersCommand : IAppCommand
 {
     private readonly string _root;
     private readonly IArchiveImageConverter _converter;
-    public CompressFoldersCommand(string root, IArchiveImageConverter? converter = null)
+    private readonly bool _deleteSource;
+    private readonly IReadOnlyList<string>? _specificFolders;
+
+    public CompressFoldersCommand(
+        string root,
+        IArchiveImageConverter? converter = null,
+        bool deleteSource = false,
+        IReadOnlyList<string>? specificFolders = null)
     {
         _root = root;
         _converter = converter ?? new WebpArchiveImageConverter();
+        _deleteSource = deleteSource;
+        _specificFolders = specificFolders;
     }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
@@ -27,7 +36,7 @@ class CompressFoldersCommand : IAppCommand
             return 1;
         }
 
-        var subfolders = Directory.GetDirectories(root).OrderBy(d => d).ToList();
+        var subfolders = _specificFolders ?? Directory.GetDirectories(root).OrderBy(d => d).ToList();
         if (subfolders.Count == 0)
         {
             Console.WriteLine("No subfolders found.");
@@ -41,17 +50,19 @@ class CompressFoldersCommand : IAppCommand
         ProgressFactory.Create().Start(ctx =>
         {
             var task = ctx.AddTask("Compressing folders to .cbz", maxValue: subfolders.Count);
-            const int descriptionWidth = 100;
 
             foreach (var folder in subfolders)
             {
-                var target = Path.Combine(Path.GetDirectoryName(folder) ?? root, Path.GetFileName(folder) + ".cbz");
+                var folderName = Path.GetFileName(folder);
+                var target = Path.Combine(Path.GetDirectoryName(folder) ?? root, folderName + ".cbz");
+
+                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format("Compressing", folderName));
 
                 if (File.Exists(target))
                 {
                     var result = new ProcessResult(target, ProcessStatus.NoChange);
                     logger.WriteEntry(result);
-                    task.Description = Markup.Escape(ProgressDescriptionFormatter.Format("Skipped", target, descriptionWidth));
+                    task.Description = Markup.Escape(ProgressDescriptionFormatter.Format("Skipped", folderName));
                     task.Increment(1);
                     skipped++;
                     continue;
@@ -73,7 +84,7 @@ class CompressFoldersCommand : IAppCommand
                         continue;
                     }
 
-                    // Step 1: read all files into memory sequentially (ZipArchive is not thread-safe for reading/writing entries concurrently)
+                    // Step 1: read all files into memory sequentially
                     var raw = new List<(string FilePath, byte[] Data)>(files.Count);
                     foreach (var f in files)
                     {
@@ -85,14 +96,13 @@ class CompressFoldersCommand : IAppCommand
                     int cpuWorkers = WorkerCount.ResolveCpuBound(0);
                     var converted = new (ConvertedImage? Result, string? Error)[raw.Count];
 
-                    System.Threading.Tasks.Parallel.For(0, raw.Count, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
+                    Parallel.For(0, raw.Count, new ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
                     {
                         try
                         {
                             var fileName = Path.GetFileName(raw[i].FilePath);
                             if (!converter.CanConvert(fileName))
                             {
-                                // Return the original bytes when the converter doesn't support this extension
                                 converted[i] = (new ConvertedImage(fileName, raw[i].Data, raw[i].Data.Length, 0, IsSmaller: false, IsBlackAndWhite: false), null);
                             }
                             else
@@ -116,7 +126,6 @@ class CompressFoldersCommand : IAppCommand
                             if (error is not null)
                                 throw new Exception(error);
 
-                            // Choose extension based on stored bytes: use the converter's chosen entry name extension
                             var chosenExt = Path.GetExtension(result!.EntryName).ToLowerInvariant();
                             var entryName = $"{(i + 1):D3}{chosenExt}";
 
@@ -125,29 +134,35 @@ class CompressFoldersCommand : IAppCommand
                             s.Write(result.Content, 0, result.Content.Length);
                         }
                     }
-                        int bwCount = 0;
-                        int colorCount = 0;
-                        foreach (var (res, err) in converted)
-                        {
-                            if (res is null) continue;
-                            if (res.IsBlackAndWhite) bwCount++; else colorCount++;
-                        }
 
-                        var detail = $"Black & White: {bwCount}  ·  Color: {colorCount}";
-                        var success = new ProcessResult(target, ProcessStatus.Updated, Detail: detail);
-                        logger.WriteEntry(success);
+                    int bwCount = 0;
+                    int colorCount = 0;
+                    foreach (var (res, _) in converted)
+                    {
+                        if (res is null) continue;
+                        if (res.IsBlackAndWhite) bwCount++; else colorCount++;
+                    }
+
+                    var detail = $"Black & White: {bwCount}  ·  Color: {colorCount}";
+                    var success = new ProcessResult(target, ProcessStatus.Updated, Detail: detail);
+                    logger.WriteEntry(success);
                     created++;
+
+                    if (_deleteSource && Directory.Exists(folder))
+                    {
+                        try { Directory.Delete(folder, recursive: true); }
+                        catch { /* best-effort cleanup */ }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // Clean up partial file
                     try { if (File.Exists(target)) File.Delete(target); } catch { }
                     var errorResult = new ProcessResult(target, ProcessStatus.Error, ex.Message);
                     logger.WriteEntry(errorResult);
                     failed++;
                 }
 
-                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format("Processing", folder, descriptionWidth));
+                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format("Processed", folderName));
                 task.Increment(1);
             }
         });

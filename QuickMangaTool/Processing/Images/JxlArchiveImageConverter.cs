@@ -2,18 +2,9 @@ using NetVips;
 
 class JxlArchiveImageConverter(int effort = 5) : IArchiveImageConverter
 {
-    private static readonly HashSet<string> SupportedExtensions =
-    [
-        ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"
-    ];
-    
     private readonly int _effort = effort;
 
-    public bool CanConvert(string entryName)
-    {
-        var extension = Path.GetExtension(entryName).ToLowerInvariant();
-        return SupportedExtensions.Contains(extension);
-    }
+    public bool CanConvert(string entryName) => ImageExtensions.CanConvert(entryName);
 
     public ConvertedImage Convert(string entryName, Stream input)
     {
@@ -37,5 +28,4 @@ class JxlArchiveImageConverter(int effort = 5) : IArchiveImageConverter
             ? new ConvertedImage(Path.ChangeExtension(entryName, ".jxl"), jxlBytes, sourceBytes, jxlBytes.Length, IsSmaller: true, IsBlackAndWhite: isBlackAndWhite)
             : new ConvertedImage(entryName, sourceData, sourceBytes, jxlBytes.Length, IsSmaller: false, IsBlackAndWhite: isBlackAndWhite);
     }
-
 }

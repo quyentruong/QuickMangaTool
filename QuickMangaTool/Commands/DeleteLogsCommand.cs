@@ -1,8 +1,13 @@
 class DeleteLogsCommand : IAppCommand
 {
     private readonly string _root;
+    private readonly bool _confirm;
 
-    public DeleteLogsCommand(string root) => _root = root;
+    public DeleteLogsCommand(string root, bool confirm = false)
+    {
+        _root = root;
+        _confirm = confirm;
+    }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
@@ -18,12 +23,15 @@ class DeleteLogsCommand : IAppCommand
             Console.WriteLine(lf);
         }
 
-        Console.Write($"Delete these {logFiles.Count} file(s)? (y/N): ");
-        var answer = Console.ReadLine();
-        if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+        if (!_confirm)
         {
-            Console.WriteLine("Aborted. No files deleted.");
-            return 0;
+            Console.Write($"Delete these {logFiles.Count} file(s)? (y/N): ");
+            var answer = Console.ReadLine();
+            if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("Aborted. No files deleted.");
+                return 0;
+            }
         }
 
         int deleted = 0;

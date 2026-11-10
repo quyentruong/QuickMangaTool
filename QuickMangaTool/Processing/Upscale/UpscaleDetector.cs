@@ -65,7 +65,7 @@ class UpscaleDetector : IUpscaleDetector
             // Collect image entries upfront to apply the index-based skip rule.
             var imageEntries = zip.Entries
                 .Where(e => !string.IsNullOrEmpty(e.Name))
-                .Where(e => Path.GetExtension(e.Name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".webp")
+                .Where(e => ImageExtensions.IsSupportedForAnalysis(e.Name))
                 .ToList();
 
             // Check the 5 smallest and 5 largest image files by uncompressed size to

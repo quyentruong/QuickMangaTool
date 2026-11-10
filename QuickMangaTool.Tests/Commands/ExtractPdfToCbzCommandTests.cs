@@ -60,4 +60,20 @@ public class ExtractPdfToCbzCommandTests : IDisposable
         var output = sw.ToString();
         Assert.Contains("Created 0 .cbz file(s).", output);
     }
+
+    [Fact]
+    public void Execute_DoesNotCompressUnrelatedSubfolders()
+    {
+        // Create an unrelated subfolder with an image in it
+        var unrelatedFolder = Path.Combine(_tempDir, "unrelated_subfolder");
+        Directory.CreateDirectory(unrelatedFolder);
+        File.WriteAllBytes(Path.Combine(unrelatedFolder, "test.png"), [1, 2, 3]);
+
+        var sut = new ExtractPdfToCbzCommand(_tempDir);
+        var ret = sut.Execute(Array.Empty<string>(), new NoopRunLogger());
+
+        Assert.Equal(0, ret);
+        Assert.False(File.Exists(Path.Combine(_tempDir, "unrelated_subfolder.cbz")),
+            "ExtractPdfToCbzCommand should never compress unrelated subfolders!");
+    }
 }

@@ -4,15 +4,13 @@ namespace QuickMangaTool.Tests.Cli;
 
 /// <summary>
 /// Unit tests for <see cref="OptionsParser"/>.
-/// Verifies argument parsing, flag combinations, and help-output behaviour.
+/// Verifies argument parsing, flag combinations, subcommands, and help-output behaviour.
 /// </summary>
 public class OptionsParserTests
 {
-    // Helper: runs Parse and discards the help output.
     private static AppOptions? Parse(params string[] args)
         => OptionsParser.Parse(args, new StringWriter());
 
-    // Helper: runs Parse and captures the text written to the output writer.
     private static (AppOptions? Options, string Output) ParseWithOutput(params string[] args)
     {
         var sb = new StringBuilder();
@@ -53,78 +51,149 @@ public class OptionsParserTests
     [Fact]
     public void DirectoryOnly_WithNoFeatureFlags_PrintsHelpAndReturnsNull()
     {
-        // A bare directory path with no feature flags is a no-op; help is shown instead.
         var (options, _) = ParseWithOutput(@"C:\manga");
 
         Assert.Null(options);
     }
 
-    // ── Dry-run / confirm ─────────────────────────────────────────────────
+    // ── Dry-run / confirm / interactive / delete-source ────────────────────
 
     [Fact]
-    public void WithoutConfirm_DefaultsToDryRun()
+    public void DryRun_DefaultsToFalse()
     {
-        var options = Parse("-g");
-
-        Assert.NotNull(options);
-        Assert.True(options.DryRun);
-    }
-
-    [Fact]
-    public void WithConfirmFlag_Long_DisablesDryRun()
-    {
-        var options = Parse("--confirm", "-g");
+        var options = Parse("-w");
 
         Assert.NotNull(options);
         Assert.False(options.DryRun);
     }
 
     [Fact]
-    public void WithConfirmFlag_Short_DisablesDryRun()
+    public void DryRunFlag_Long_EnablesDryRun()
     {
-        var options = Parse("-y", "-g");
-
-        Assert.NotNull(options);
-        Assert.False(options.DryRun);
-    }
-
-    [Fact]
-    public void DryRunFlag_Long_ForcesOnEvenWithConfirm()
-    {
-        // --dry-run wins even when --confirm is also present.
-        var options = Parse("--confirm", "--dry-run", "-g");
+        var options = Parse("--dry-run", "-w");
 
         Assert.NotNull(options);
         Assert.True(options.DryRun);
     }
 
-    // ── Feature flags ─────────────────────────────────────────────────────
-
     [Fact]
-    public void GenreToTagsFlag_Long_SetsGenreToTags()
+    public void DryRunFlag_Short_EnablesDryRun()
     {
-        var options = Parse("--genre-to-tags");
+        var options = Parse("-n", "-w");
 
         Assert.NotNull(options);
-        Assert.True(options.GenreToTags);
+        Assert.True(options.DryRun);
     }
 
     [Fact]
-    public void GenreToTagsFlag_Short_SetsGenreToTags()
+    public void ConfirmFlag_Long_SetsConfirm()
     {
-        var options = Parse("-g");
+        var options = Parse("--confirm", "-w");
 
         Assert.NotNull(options);
-        Assert.True(options.GenreToTags);
+        Assert.True(options.Confirm);
     }
 
     [Fact]
-    public void DetectUpscaleFlag_Long_SetsDetectUpscale()
+    public void ConfirmFlag_Short_SetsConfirm()
     {
-        var options = Parse("--detect-upscale");
+        var options = Parse("-y", "-w");
 
         Assert.NotNull(options);
-        Assert.True(options.DetectUpscale);
+        Assert.True(options.Confirm);
+    }
+
+    [Fact]
+    public void DeleteSourceFlag_SetsDeleteSource()
+    {
+        var options = Parse("--delete-source", "cbr-to-cbz");
+
+        Assert.NotNull(options);
+        Assert.True(options.DeleteSource);
+    }
+
+    [Fact]
+    public void InteractiveFlag_Long_SetsInteractive()
+    {
+        var options = Parse("--interactive");
+
+        Assert.NotNull(options);
+        Assert.True(options.Interactive);
+    }
+
+    [Fact]
+    public void InteractiveFlag_Short_SetsInteractive()
+    {
+        var options = Parse("-i");
+
+        Assert.NotNull(options);
+        Assert.True(options.Interactive);
+    }
+
+    // ── Commands & Flags ──────────────────────────────────────────────────
+
+    [Fact]
+    public void ConvertFlag_Short_SetsConvertImages()
+    {
+        var options = Parse("-w");
+
+        Assert.NotNull(options);
+        Assert.True(options.ConvertImages);
+        Assert.True(options.ConvertToWebp);
+    }
+
+    [Fact]
+    public void ConvertFlag_Long_SetsConvertImages()
+    {
+        var options = Parse("--convert");
+
+        Assert.NotNull(options);
+        Assert.True(options.ConvertImages);
+    }
+
+    [Fact]
+    public void ConvertSubcommand_SetsConvertImages()
+    {
+        var options = Parse("convert");
+
+        Assert.NotNull(options);
+        Assert.True(options.ConvertImages);
+    }
+
+    [Fact]
+    public void CompressSubcommand_SetsCompressFolders()
+    {
+        var options = Parse("compress");
+
+        Assert.NotNull(options);
+        Assert.True(options.CompressFolders);
+    }
+
+    [Fact]
+    public void CompressFlag_SetsCompressFolders()
+    {
+        var options = Parse("--compress-folders");
+
+        Assert.NotNull(options);
+        Assert.True(options.CompressFolders);
+    }
+
+    [Fact]
+    public void PdfToCbzSubcommand_SetsPdfToCbz()
+    {
+        var options = Parse("pdf-to-cbz");
+
+        Assert.NotNull(options);
+        Assert.True(options.PdfToCbz);
+    }
+
+    [Fact]
+    public void CbrToCbzSubcommand_SetsCbrToCbz()
+    {
+        var options = Parse("cbr-to-cbz");
+
+        Assert.NotNull(options);
+        Assert.True(options.CbrToCbz);
     }
 
     [Fact]
@@ -137,93 +206,68 @@ public class OptionsParserTests
     }
 
     [Fact]
-    public void AddDuplicatesFlag_Long_SetsAddDuplicates()
+    public void UpscaleSubcommand_SetsDetectUpscale()
     {
-        var options = Parse("--add-duplicates");
+        var options = Parse("upscale");
 
         Assert.NotNull(options);
-        Assert.True(options.AddDuplicates);
+        Assert.True(options.DetectUpscale);
     }
 
     [Fact]
-    public void DetectDuplicatesFlag_Long_SetsDetectDuplicates()
+    public void RemoveOldCbzSubcommand_SetsRemoveOldCbz()
     {
-        var options = Parse("--detect-duplicates");
+        var options = Parse("remove-old");
 
         Assert.NotNull(options);
-        Assert.True(options.DetectDuplicates);
+        Assert.True(options.RemoveOldCbz);
     }
 
     [Fact]
-    public void ConvertToWebpFlag_Long_SetsConvertToWebp()
+    public void ReadLogsSubcommand_SetsReadLogs()
     {
-        var options = Parse("--convert-to-webp");
+        var options = Parse("read-logs");
 
         Assert.NotNull(options);
-        Assert.True(options.ConvertToWebp);
+        Assert.True(options.ReadLogs);
     }
 
     [Fact]
-    public void ConvertToWebpFlag_Short_SetsConvertToWebp()
+    public void DeleteLogsSubcommand_SetsDeleteLogs()
     {
-        var options = Parse("-w");
+        var options = Parse("delete-logs");
 
         Assert.NotNull(options);
-        Assert.True(options.ConvertToWebp);
+        Assert.True(options.DeleteLogs);
     }
 
     [Fact]
-    public void EffortFlag_ParsesValue()
+    public void VipsDiagnosticsSubcommand_SetsVipsDiagnostics()
     {
-        var options = Parse("--image-format=webp", "--effort=9", "-w");
+        var options = Parse("diag");
 
         Assert.NotNull(options);
-        Assert.Equal(9, options.Effort);
+        Assert.True(options.VipsDiagnostics);
     }
 
     [Fact]
-    public void EffortFlag_InvalidValue_IsIgnored()
+    public void ClearCacheFlag_Short_SetsClearCache()
     {
-        var options = Parse("--image-format=webp", "--effort=abc", "-w");
+        var options = Parse("-c");
 
         Assert.NotNull(options);
-        Assert.Null(options.Effort);
+        Assert.True(options.ClearCache);
     }
 
-    [Fact]
-    public void EffortFlag_ParsesValue_ForJxl()
-    {
-        var options = Parse("--image-format=jxl", "--effort=7", "-w");
-
-        Assert.NotNull(options);
-        Assert.Equal(7, options.Effort);
-    }
+    // ── ImageFormat & Effort ──────────────────────────────────────────────
 
     [Fact]
-    public void EffortFlag_InvalidValue_ForJxl_IsIgnored()
+    public void ImageFormatFlag_Avif_SetsImageFormat()
     {
-        var options = Parse("--image-format=jxl", "--effort=abc", "-w");
+        var options = Parse("--image-format=avif", "-w");
 
         Assert.NotNull(options);
-        Assert.Null(options.Effort);
-    }
-
-    [Fact]
-    public void EffortFlag_ParsesValue_ForAvif()
-    {
-        var options = Parse("--image-format=avif", "--effort=6", "-w");
-
-        Assert.NotNull(options);
-        Assert.Equal(6, options.Effort);
-    }
-
-    [Fact]
-    public void EffortFlag_InvalidValue_ForAvif_IsIgnored()
-    {
-        var options = Parse("--image-format=avif", "--effort=abc", "-w");
-
-        Assert.NotNull(options);
-        Assert.Null(options.Effort);
+        Assert.Equal(ImageFormat.Avif, options.ImageFormat);
     }
 
     [Fact]
@@ -236,39 +280,21 @@ public class OptionsParserTests
     }
 
     [Fact]
-    public void CbrToCbzFlag_Long_SetsCbrToCbz()
+    public void EffortFlag_ParsesValue()
     {
-        var options = Parse("--cbr-to-cbz");
+        var options = Parse("--effort=7", "-w");
 
         Assert.NotNull(options);
-        Assert.True(options.CbrToCbz);
+        Assert.Equal(7, options.Effort);
     }
 
     [Fact]
-    public void RemoveOldCbzFlag_Long_SetsRemoveOldCbz()
+    public void EffortFlag_InvalidValue_IsIgnored()
     {
-        var options = Parse("--remove-old-cbz");
+        var options = Parse("--effort=abc", "-w");
 
         Assert.NotNull(options);
-        Assert.True(options.RemoveOldCbz);
-    }
-
-    [Fact]
-    public void ClearCacheFlag_Long_SetsClearCache()
-    {
-        var options = Parse("--clear-cache");
-
-        Assert.NotNull(options);
-        Assert.True(options.ClearCache);
-    }
-
-    [Fact]
-    public void ClearCacheFlag_Short_SetsClearCache()
-    {
-        var options = Parse("-c");
-
-        Assert.NotNull(options);
-        Assert.True(options.ClearCache);
+        Assert.Null(options.Effort);
     }
 
     // ── Parallelism ───────────────────────────────────────────────────────
@@ -276,7 +302,7 @@ public class OptionsParserTests
     [Fact]
     public void ParallelFlag_ParsesValue()
     {
-        var options = Parse("--parallel=4", "-g");
+        var options = Parse("--parallel=4", "-w");
 
         Assert.NotNull(options);
         Assert.Equal(4, options.Parallelism);
@@ -285,36 +311,18 @@ public class OptionsParserTests
     [Fact]
     public void ParallelFlag_InvalidValue_DefaultsToZero()
     {
-        var options = Parse("--parallel=abc", "-g");
+        var options = Parse("--parallel=abc", "-w");
 
         Assert.NotNull(options);
         Assert.Equal(0, options.Parallelism);
     }
 
-    [Fact]
-    public void PhashThresholdFlag_ParsesValue()
-    {
-        var options = Parse("--detect-duplicates", "--phash-threshold=12");
-
-        Assert.NotNull(options);
-        Assert.Equal(12, options.PhashThreshold);
-    }
+    // ── Directory handling ────────────────────────────────────────────────
 
     [Fact]
-    public void PhashThresholdFlag_DefaultsToEight_WhenMissing()
+    public void ExplicitDirectory_IsUsedWithSubcommand()
     {
-        var options = Parse("--detect-duplicates");
-
-        Assert.NotNull(options);
-        Assert.Equal(8, options.PhashThreshold);
-    }
-
-    // ── Directory ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void ExplicitDirectory_IsUsed()
-    {
-        var options = Parse(@"C:\manga", "-g");
+        var options = Parse(@"C:\manga", "convert");
 
         Assert.NotNull(options);
         Assert.Equal(@"C:\manga", options.Directory);
@@ -323,7 +331,7 @@ public class OptionsParserTests
     [Fact]
     public void NoDirectory_DefaultsToCurrentDirectory()
     {
-        var options = Parse("-g");
+        var options = Parse("convert");
 
         Assert.NotNull(options);
         Assert.Equal(Directory.GetCurrentDirectory(), options.Directory);

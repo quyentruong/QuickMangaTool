@@ -8,19 +8,22 @@ enum ImageFormat
 record AppOptions(
     string Directory,
     bool DryRun,
-    bool AddDuplicates,
-    bool GenreToTags,
+    bool Confirm,
+    bool Interactive,
     bool DetectUpscale,
-    bool DetectDuplicates,
     bool CompressFolders,
-    bool ConvertToWebp,
+    bool ConvertImages,
     ImageFormat ImageFormat,
     bool RemoveOldCbz,
+    bool DeleteSource,
     bool ReadLogs,
     bool DeleteLogs,
+    bool VipsDiagnostics,
     bool PdfToCbz,
     bool CbrToCbz,
     int Parallelism,
-    int PhashThreshold,
     int? Effort,
-    bool ClearCache);
+    bool ClearCache)
+{
+    public bool ConvertToWebp => ConvertImages;
+}

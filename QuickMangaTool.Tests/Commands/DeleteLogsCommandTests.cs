@@ -50,4 +50,19 @@ public class DeleteLogsCommandTests : IDisposable
         var ret = sut.Execute(Array.Empty<string>(), new NoopRunLogger());
         Assert.Equal(0, ret);
     }
+
+    [Fact]
+    public void Execute_WithConfirmTrue_DeletesWithoutPrompt()
+    {
+        var a = Path.Combine(_tempDir, "confirm.log");
+        File.WriteAllText(a, "log content");
+
+        // Set console in to empty string reader so if it prompts it would return null/abort
+        Console.SetIn(new StringReader(""));
+        var sut = new DeleteLogsCommand(_tempDir, confirm: true);
+        var ret = sut.Execute(Array.Empty<string>(), new NoopRunLogger());
+
+        Assert.Equal(0, ret);
+        Assert.False(File.Exists(a));
+    }
 }

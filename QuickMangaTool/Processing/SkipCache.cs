@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-// Avoid System.Text.Json to prevent trimming/AOT warnings; use a simple binary format.
 
 /// <summary>
 /// Simple persistent cache of archives that previously had "No change".
@@ -16,10 +15,34 @@ static class SkipCache
 
     static SkipCache()
     {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var dir = Path.Combine(home, ".quickmangatool");
-        if (!Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
+        string dir;
+        var custom = Environment.GetEnvironmentVariable("QUICKMANGATOOL_CACHE_DIR");
+        if (!string.IsNullOrWhiteSpace(custom))
+        {
+            dir = custom;
+        }
+        else
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            dir = Path.Combine(string.IsNullOrWhiteSpace(home) ? Path.GetTempPath() : home, ".quickmangatool");
+        }
+
+        try
+        {
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+        }
+        catch
+        {
+            dir = Path.Combine(Path.GetTempPath(), ".quickmangatool");
+            try
+            {
+                if (!Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+            }
+            catch { /* best-effort */ }
+        }
+
         _cachePath = Path.Combine(dir, "skipcache.dat");
     }
 
@@ -61,7 +84,6 @@ static class SkipCache
 
     private static void Save()
     {
-        // Ensure entries are loaded before attempting to save.
         EnsureLoaded();
         lock (_lock)
         {
@@ -98,7 +120,6 @@ static class SkipCache
 
                 if (!File.Exists(fullPath))
                 {
-                    // file removed; drop cache entry
                     _entries.Remove(fullPath);
                     Save();
                     return false;
@@ -108,7 +129,6 @@ static class SkipCache
                 if (current == storedTicks)
                     return true;
 
-                // file modified since cached; drop entry
                 _entries.Remove(fullPath);
                 Save();
                 return false;

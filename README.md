@@ -1,16 +1,21 @@
 # QuickMangaTool
 
-A C# .NET 10 command-line utility for bulk processing manga archives in `.cbz` format. It recursively scans a directory for `.cbz` files and can transform embedded XML metadata or analyze image quality to identify archives that need upscaling or restoration.
+A C# .NET 10 command-line utility for bulk processing, optimizing, and analyzing manga/comic archives (`.cbz`, `.cbr`, `.pdf`).
 
 ## Features
 
-- **Genre → Tags migration**: Renames `<Genre>` elements to `<Tags>` in every `ComicInfo.xml` inside each archive, migrating from the old ComicInfo field to the newer standard.
-- **Image conversion (WebP, AVIF, or JPEG XL)**: Converts images in `.cbz` archives to a chosen output format when it results in a smaller file, preserving the original if it is smaller. The default output format is WebP; WebP, JPEG XL, and AVIF all use the shared `--effort` setting (higher values are slower but can compress better). Supported input formats: JPG, PNG, BMP, GIF, TIFF, AVIF.
-- **Upscale detection**: Samples images from each archive and flags pages that appear low-resolution, blurry, or noisy using Laplacian variance and Immerkaer noise analysis.
-- **Dry-run by default**: No files are modified unless `--confirm` is explicitly passed.
-- **Skip cache**: Previously processed archives are cached so re-runs skip unchanged files automatically.
-- **Parallel processing**: Configurable worker count (default 2, capped at `min(CPU×2, 8)`) with a live Spectre.Console progress bar.
-- **Timestamped log file**: A `.log` file is written to the target directory on every run.
+- **Interactive TUI Menu**: Run `QuickMangaTool` without arguments to launch an interactive terminal menu powered by Spectre.Console.
+- **Image Conversion (WebP, AVIF, or JPEG XL)**: Converts images inside `.cbz` archives to a chosen format when it results in a smaller file, preserving original images if they are smaller. Default is WebP; WebP, AVIF, and JPEG XL all support a configurable `--effort` setting.
+- **Archive Creation**:
+  - `compress`: Compresses subfolders containing loose images into `.cbz` files.
+  - `pdf-to-cbz`: Extracts embedded images from PDF files directly into `.cbz` files.
+  - `cbr-to-cbz`: Converts `.cbr` archives recursively to `.cbz`.
+- **Quality & Upscale Detection**: Samples images from each archive and flags pages that appear low-resolution, blurry, or noisy using Laplacian variance and Immerkaer noise analysis.
+- **Optional Source Deletion**: `--delete-source` flag allows removing the original `.cbr`, `.pdf`, or subfolder once `.cbz` creation succeeds.
+- **Opt-in Dry-run**: Real modification by default; `--dry-run` (`-n`) previews image conversion size savings without modifying archives.
+- **Skip Cache**: Automatically caches clean archives (`~/.quickmangatool/skipcache.dat`) so re-runs skip unchanged files.
+- **Parallel Processing**: Configurable worker count tuned for CPU and disk I/O with rich Spectre.Console progress bars.
+- **Timestamped Logs**: Detailed colored logs generated per batch run.
 
 ## Build on Linux
 
@@ -30,165 +35,88 @@ dotnet publish QuickMangaTool/QuickMangaTool.csproj -c Release -r linux-x64 --se
 Published output will be under:
 
 ```text
-QuickMangaTool/bin/Release/net10.0/linux-x64/publish/
-```
-
-Run it on Linux:
-
-```bash
-./QuickMangaTool/bin/Release/net10.0/linux-x64/publish/QuickMangaTool
-
-```
-
-## Test coverage
-
-You can collect test coverage with Coverlet and render an HTML report using ReportGenerator.
-
-1. Add Coverlet to the test project (one-time):
-
-```bash
-dotnet add QuickMangaTool.Tests/QuickMangaTool.Tests.csproj package coverlet.msbuild
-```
-
-2. Run tests and produce an OpenCover-format coverage file:
-
-```bash
-dotnet test QuickMangaTool.slnx --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=./coverage/
-```
-
-3. Install ReportGenerator (global tool) and create an HTML report:
-
-```bash
-dotnet tool install -g dotnet-reportgenerator-globaltool
-reportgenerator -reports:"**/coverage.opencover.xml" -targetdir:"coverage-report" -reporttypes:Html
-```
-
-4. Open the report by opening `coverage-report/index.htm` in your browser.
-
-This writes coverage files under `TestResults/`; you can point ReportGenerator at the produced coverage XML files to generate the same HTML output.
-
-## Log commands
-
-Two standalone commands help manage run log files written to the target directory:
-
-- `--read-logs` — interactively read one or more `.log` files found under the given path.
-	- If a single `.log` file is found it is printed immediately.
-	- If multiple are found you are shown a numbered list and prompted to choose by number, a comma-separated list (e.g. `1,3`), or `all` to print every log.
-
-- `--delete-logs` — deletes all `.log` files found under the given path. Returns non-zero if any deletions fail.
-
-Both commands accept an optional path as the first argument. Examples:
-
-```bash
-# Read logs under the current directory (interactive selection)
-QuickMangaTool --read-logs
-
-# Read logs under a specific directory
-QuickMangaTool /path/to/manga --read-logs
-
-# Delete all logs under a directory
-QuickMangaTool /path/to/manga --delete-logs
-```
+QuickMangaTool/bin/Release/net10.0/linux-x64/publish/QuickMangaTool
 ```
 
 ## Usage
 
-```
-QuickMangaTool [path] [options]
+```bash
+# Launch interactive menu
+QuickMangaTool
+
+# Or run specific commands directly
+QuickMangaTool [path] [command|options]
 ```
 
-If `path` is omitted, the current directory is used.
+If `path` is omitted, the current working directory is used.
+
+### Commands
+
+| Command | Short / Alias | Description |
+|---|---|---|
+| `convert` | `-w`, `--convert-to-webp` | Convert images in `.cbz` archives to WebP/AVIF/JXL when smaller |
+| `compress` | `--compress-folders` | Compress each subfolder into an individual `.cbz` |
+| `pdf-to-cbz` | `--pdf-to-cbz` | Extract images from PDFs into `.cbz` archives |
+| `cbr-to-cbz` | `--cbr-to-cbz` | Recursively convert `.cbr` archives to `.cbz` |
+| `upscale` | `-u`, `--detect-upscale` | Scan archive images for resolution, blur, or noise issues |
+| `remove-old` | `--remove-old-cbz` | Delete leftover `.old.cbz` backup files |
+| `read-logs` | `--read-logs` | Interactively view run log files |
+| `delete-logs` | `--delete-logs` | Delete all `.log` files in the target directory |
+| `diag` | `--vips-diagnostics` | Print NetVips & system libvips codec configuration |
+| `clear-cache` | `-c`, `--clear-cache` | Clear the persistent skip cache |
 
 ### Options
 
 | Flag | Short | Description |
 |---|---|---|
+| `--interactive` | `-i` | Launch interactive menu |
+| `--dry-run` | `-n` | Preview changes without modifying `.cbz` files (used with `convert`) |
+| `--confirm` | `-y` | Confirm deletions or prompts automatically |
+| `--delete-source` | | Delete original file/folder after successful `.cbz` creation (`compress`, `pdf-to-cbz`, `cbr-to-cbz`) |
+| `--image-format=webp\|avif\|jxl` | | Target output image format (default: `webp`) |
+| `--effort=N` | | Encoder effort level (WebP: `0-6`, JXL: `1-9`, AVIF: `0-9`) |
+| `--parallel=N` | | Worker thread count (default: tuned for CPU/disk) |
 | `--help` | `-h` | Show help and exit |
-| `--dry-run` | `-n` | Preview changes without modifying any files (default) |
-| `--confirm` | `-y` | Apply changes to `.cbz` files |
-| `--genre-to-tags` | `-g` | Apply the Genre → Tags XML metadata transformation |
-| `--convert-to-webp` | `-w` | Convert images in archives to WebP (or another chosen format) when smaller than the original |
-| `--image-format=webp|avif|jxl` | | Choose output image format when converting or compressing (default: `webp`) |
-| `--effort=N` | | Set WebP/JPEG XL/AVIF encoder effort when `--image-format=webp|jxl|avif` is selected (default: `6` for WebP, `5` for JXL, `3` for AVIF) |
-| `--compress-folders`, `--compress` | | Compress every subfolder under the given path into an individual `.cbz` |
-| `--pdf-to-cbz` | | Extract images from PDFs in a folder and produce `.cbz` files next to each PDF (non-recursive) |
-| `--cbr-to-cbz` | | Recursively convert `.cbr` archives to `.cbz` |
-| `--detect-upscale` | `-u` | Scan archive images for quality issues |
-| `--remove-old-cbz` | | Remove `.old.cbz` backup files after conversion (or run standalone to delete leftover backups) |
-| `--parallel=N` | | Set parallel worker count (default: tuned for system) |
-| `--phash-threshold=N` | | Maximum Hamming distance for pHash duplicate matching (default: 8) |
-| `--read-logs` | | Interactively read `.log` files found under the target path |
-| `--delete-logs` | | Delete `.log` files found under the target path |
-| `--clear-cache` | `-c` | Delete the persistent skip cache and exit |
 
 ### Examples
 
 ```bash
-# Dry-run (preview) in the current directory
-QuickMangaTool.exe
+# Launch interactive menu
+QuickMangaTool
 
-# Dry-run in a specific directory
-QuickMangaTool.exe C:\manga -n
+# Convert images in C:\manga to WebP (modifies archives, keeps .old.cbz backup)
+QuickMangaTool C:\manga convert
 
-# Apply Genre→Tags transformation
-QuickMangaTool.exe C:\manga -g -y
+# Dry-run: preview size savings without writing changes
+QuickMangaTool C:\manga convert -n
+
+# Convert to AVIF with effort 6 and delete .old.cbz backups after conversion
+QuickMangaTool C:\manga convert --image-format=avif --effort=6 --remove-old-cbz
+
+# Convert to JPEG XL with effort 7
+QuickMangaTool C:\manga convert --image-format=jxl --effort=7
+
+# Compress subfolders into .cbz and delete source folders on success
+QuickMangaTool /path/to/manga compress --delete-source
+
+# Extract all PDFs in a folder to CBZ and remove source PDFs
+QuickMangaTool /path/to/pdfs pdf-to-cbz --delete-source
+
+# Convert CBR archives to CBZ and remove source CBRs
+QuickMangaTool /path/to/cbrs cbr-to-cbz --delete-source
 
 # Scan for archives that may need upscaling (read-only)
-QuickMangaTool.exe C:\manga -u
+QuickMangaTool /path/to/manga upscale
 
-# Apply multiple operations at once
-QuickMangaTool.exe C:\manga -g -u -y
+# Delete all leftover .old.cbz backups without asking for confirmation
+QuickMangaTool /path/to/manga remove-old -y
 
-# Clear the skip cache
-QuickMangaTool.exe --clear-cache
-
-# Convert images to AVIF with a higher encoder effort
-QuickMangaTool.exe C:\manga --image-format=avif --effort=6 -w -y
-
-# Convert images to JPEG XL with a higher encoder effort
-QuickMangaTool.exe C:\manga --image-format=jxl --effort=7 -w -y
-
-# Convert all PDFs in a folder to CBZ (non-recursive). For each `sample.pdf` the tool
-# will create `sample.cbz` next to the PDF, skipping any PDFs that already have a
-# corresponding `.cbz` file.
-QuickMangaTool.exe /path/to/folder --pdf-to-cbz
+# Verify libvips system installation and codec support (WebP, HEIF/AVIF, JXL)
+QuickMangaTool --vips-diagnostics
 ```
-
-## Commands
-
-### Image Conversion (`--convert-to-webp`)
-
-Finds all supported images (JPG, PNG, BMP, GIF, TIFF, AVIF) in each `.cbz` archive and converts them to the selected output format if the resulting file is smaller. If the original image is smaller, it is kept instead. This process helps reduce archive size without sacrificing image quality. The final archive may contain a mix of original and converted images, depending on which format is smaller for each entry.
-
-When `--image-format=avif` is selected, `--effort=N` controls the AVIF encoder effort level. Higher values usually compress slightly better but take longer to encode.
-
-In dry-run mode, reports how many images *would* be converted without writing to disk.
-
-### Genre → Tags (`--genre-to-tags`)
-
-Finds every `ComicInfo.xml` inside each `.cbz` and renames all `<Genre>` elements to `<Tags>`, preserving child nodes and attributes. Archives that require no change are recorded in the skip cache and skipped on future runs.
-
-In dry-run mode, reports how many archives *would* be updated without writing to disk.
-
-### Upscale Detection (`--detect-upscale`)
-
-Always read-only. Samples up to 10 images per archive (the 5 smallest and 5 largest by uncompressed size) and runs four quality checks:
-
-| Check | Threshold | Notes |
-|---|---|---|
-| Minimum width | 800 px | Images narrower than 300 px (ads/banners) are excluded |
-| DPI | ≥ 72 DPI | Only checked when DPI metadata is present |
-| Blur (Laplacian σ²) | ≥ 50.0 | Title cards and chapter dividers (low edge density) are excluded |
-| Noise (Immerkaer σ) | ≤ 12.5 | High-contrast pages are excluded to avoid false positives |
-
-Archives with at least one flagged image are reported as needing upscaling. Clean archives are added to the skip cache.
-
-## Skip Cache
-
-Stored at `~/.quickmangatool/skipcache.dat`. Each entry records the archive path and its last-modified timestamp — if the file changes, it is automatically re-processed. Use `--clear-cache` to remove the cache entirely.
 
 ## Requirements
 
 - .NET 10 runtime
-- Windows or Linux (x64)
- - libvips (native) — required when using NetVips for WebP/AVIF conversion. See [docs/libvips.md](docs/libvips.md) for installation and CI instructions.
+- Linux (x64) or Windows (x64)
+- `libvips` installed on system (with WebP, AVIF/HEIF, and JXL plugins enabled)
