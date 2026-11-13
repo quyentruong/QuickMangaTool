@@ -6,13 +6,24 @@ class Program
     {
         AppVersionHelper.CleanupOldExecutableIfPresent();
 
-        bool isInteractive = args.Contains("--interactive") || args.Contains("-i") ||
-            (!Console.IsInputRedirected && (args.Length == 0 ||
-                (args.Length == 1 && !args[0].StartsWith('-') && !OptionsParser.IsKnownSubcommand(args[0]))));
+        bool isInteractiveCandidate = TerminalLauncher.IsInteractiveCandidate(args);
 
-        if (isInteractive)
+        if (isInteractiveCandidate)
         {
-            return RunInteractiveLoop(args);
+            if (!Console.IsInputRedirected && !Console.IsOutputRedirected)
+            {
+                return RunInteractiveLoop(args);
+            }
+
+            if (TerminalLauncher.TryRelaunchInTerminal(args))
+            {
+                return 0;
+            }
+
+            if (args.Contains("--interactive") || args.Contains("-i"))
+            {
+                return RunInteractiveLoop(args);
+            }
         }
 
         return RunCli(args);
@@ -21,9 +32,13 @@ class Program
     private static int RunInteractiveLoop(string[] args)
     {
         var initialDir = args.FirstOrDefault(a => !a.StartsWith('-'));
+        var fallbackDir = TerminalLauncher.ResolveDefaultWorkingDirectory(
+            Directory.GetCurrentDirectory(),
+            Environment.ProcessPath,
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         var currentDir = !string.IsNullOrWhiteSpace(initialDir) && Directory.Exists(initialDir)
             ? Path.GetFullPath(initialDir)
-            : (LastLocationStore.GetLastDirectory() ?? Directory.GetCurrentDirectory());
+            : (LastLocationStore.GetLastDirectory() ?? fallbackDir);
 
         currentDir = Path.GetFullPath(currentDir);
         LastLocationStore.SaveLastDirectory(currentDir);
