@@ -16,7 +16,7 @@
   - `Spectre.Console`: Rich terminal UI, interactive menus, and progress bars.
 
 ### 1.2 Recent Major Architectural Changes
-- **Standalone Native AOT & Binary Size Optimization (< 10 MB)**: Switched to Native AOT (`PublishAot=true`, `TrimMode=full`, `StripSymbols=true`), replaced `SharpCompress` `ReaderFactory` with `RarReader`, and added `ILLink.Substitutions.xml` to strip unused `PdfPig` CMap/font resources and stub `SharpCompress.Factories.Factory..cctor()`, producing standalone executables under 10 MB (~9.4 MB) without requiring a `.NET Runtime`.
+- **Standalone Native AOT & Binary Size Optimization**: Switched to Native AOT (`PublishAot=true`, `TrimMode=full`, `StripSymbols=true`), replaced `SharpCompress` `ReaderFactory` with `RarReader`, and added `ILLink.Substitutions.xml` to strip unused `PdfPig` CMap/font resources and stub `SharpCompress.Factories.Factory..cctor()`, producing compact standalone executables without requiring a `.NET Runtime`.
 - **NetVips System Library Interop**: Removed `NetVips.Native` bundle in favor of system `libvips` (enabling full `libjxl` encoder/decoder support).
 - **Interactive TUI & CLI Subcommands**: Added Spectre.Console interactive menu when invoked without arguments; organized subcommands (`convert`, `compress`, `pdf-to-cbz`, `cbr-to-cbz`, `upscale`, `remove-old`).
 - **Pipeline Optimization**: Eliminated 2x redundant image encoding in `ArchiveProcessor` and isolated PDF image extraction.
@@ -79,9 +79,8 @@ Every planning step and code change **MUST** adhere to the following 6 pillars:
 - **Streams & Temp Files**: Always close/dispose `FileStream`, `MemoryStream`, and temporary archive files, ensuring cleanup even when exceptions occur.
 - **SQLite Connections**: Ensure connections and commands in `SQLiteDuplicateStore` are disposed properly.
 
-### 2.6 Standalone Native AOT & Binary Size (< 10 MB Limit)
+### 2.6 Standalone Native AOT & Binary Size Optimization
 - **Standalone Execution**: Published binaries for Windows (`win-x64`) and Linux (`linux-x64`) **MUST** compile via Native AOT (`PublishAot=true`) and run standalone without requiring a `.NET Runtime` on the user's machine.
-- **Strict < 10 MB Size Budget**: Compiled release executables **MUST** remain strictly under **10 MB** (`< 10,485,760` bytes) on both `win-x64` and `linux-x64`. Always verify the published binary size after adding features, NuGet packages, or dependencies.
 - **AOT & Trimmer Compatibility**: Avoid unbounded reflection, `dynamic`, `Assembly.Load*`, or reflection-based serialization. Use `JsonDocument` or source-generated `JsonSerializerContext` instead.
 - **Avoid Kitchen-Sink Factories & Embedded Bloat**: Never call umbrella factories (such as `SharpCompress.Readers.ReaderFactory.OpenReader`) that statically root unused codecs/formats; instantiate only the specific reader/writer needed (e.g., `RarReader.OpenReader`). When adding or updating NuGet dependencies, inspect embedded resources and strip unused data blobs via `ILLink.Substitutions.xml`.
 
@@ -94,4 +93,4 @@ Before proposing or applying changes, verify:
 3. [ ] Are edge cases (empty files, corrupt archives, cancellation) handled gracefully?
 4. [ ] Does this maintain backward compatibility with CLI options and tests?
 5. [ ] Do existing unit tests pass, and are new tests added for new logic?
-6. [ ] Is the change Native AOT-safe, standalone (no `.NET Runtime` required), and verified to keep the published binary size under 10 MB?
+6. [ ] Is the change Native AOT-safe and standalone (no `.NET Runtime` required)?

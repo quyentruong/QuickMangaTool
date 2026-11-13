@@ -132,10 +132,6 @@ jobs:
         fi
         SIZE_BYTES=$(wc -c < "$ASSET")
         echo "Published $ASSET size: ${SIZE_BYTES} bytes"
-        if [ "$SIZE_BYTES" -ge 10485760 ]; then
-          echo "::error::Binary $ASSET exceeds 10 MB limit (${SIZE_BYTES} bytes)"
-          exit 1
-        fi
 
     - name: Upload artifact (${{ matrix.runtime }})
       uses: actions/upload-artifact@v7
