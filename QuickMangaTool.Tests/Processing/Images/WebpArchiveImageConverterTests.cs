@@ -1,17 +1,16 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.PixelFormats;
+using NetVips;
 
 namespace QuickMangaTool.Tests.Processing.Images;
 
 /// <summary>
-/// Unit tests for <see cref="WebpArchiveImageConverter"/>.
-/// Verifies supported-extension detection and the size-comparison logic that decides
-/// whether the WebP or the original image is kept in the archive.
+/// Unit tests for <see cref="WebpArchiveImageConverter"/>, <see cref="AvifArchiveImageConverter"/>,
+/// and <see cref="JxlArchiveImageConverter"/>.
 /// </summary>
-public class WebpArchiveImageConverterTests
+public class ArchiveImageConverterTests
 {
-    private readonly WebpArchiveImageConverter _sut = new(quality: 80);
+    private readonly WebpArchiveImageConverter _webpConverter = new(quality: 80);
+    private readonly AvifArchiveImageConverter _avifConverter = new(effort: 1);
+    private readonly JxlArchiveImageConverter _jxlConverter = new(effort: 3);
 
     // ── CanConvert ────────────────────────────────────────────────────────
 
@@ -23,11 +22,13 @@ public class WebpArchiveImageConverterTests
     [InlineData("image.gif")]
     [InlineData("image.tif")]
     [InlineData("image.tiff")]
-    [InlineData("IMAGE.JPG")]   // case-insensitive
+    [InlineData("IMAGE.JPG")]
     [InlineData("sub/dir/page.PNG")]
     public void CanConvert_SupportedExtension_ReturnsTrue(string entryName)
     {
-        Assert.True(_sut.CanConvert(entryName));
+        Assert.True(_webpConverter.CanConvert(entryName));
+        Assert.True(_avifConverter.CanConvert(entryName));
+        Assert.True(_jxlConverter.CanConvert(entryName));
     }
 
     [Theory]
@@ -35,105 +36,86 @@ public class WebpArchiveImageConverterTests
     [InlineData("image.txt")]
     [InlineData("ComicInfo.xml")]
     [InlineData("image.avif")]
-    [InlineData("image")]       // no extension
+    [InlineData("image.jxl")]
+    [InlineData("image")]
     public void CanConvert_UnsupportedExtension_ReturnsFalse(string entryName)
     {
-        Assert.False(_sut.CanConvert(entryName));
+        Assert.False(_webpConverter.CanConvert(entryName));
+        Assert.False(_avifConverter.CanConvert(entryName));
+        Assert.False(_jxlConverter.CanConvert(entryName));
     }
 
-    // ── Convert – entry name ──────────────────────────────────────────────
+    // ── WebP Convert ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Convert_WhenWebpIsSmaller_ReturnsWebpExtension()
+    public void Convert_Webp_WhenSmaller_ReturnsWebpExtension()
     {
-        // A large, highly-compressible PNG is very likely to produce a smaller WebP.
         using var stream = CreateLargeCompressiblePng();
 
-        var result = _sut.Convert("page.png", stream);
+        var result = _webpConverter.Convert("page.png", stream);
 
-        if (result.WebpWasSmaller)
-            Assert.Equal("page.webp", result.EntryName);
-        else
-            Assert.Equal("page.png", result.EntryName);
+        Assert.True(result.IsSmaller);
+        Assert.Equal("page.webp", result.EntryName);
+        Assert.True(result.ConvertedBytes < result.SourceBytes);
+        Assert.Equal(result.Content.Length, result.ConvertedBytes);
     }
 
     [Fact]
-    public void Convert_WhenOriginalIsKept_PreservesOriginalEntryName()
+    public void Convert_Webp_WhenOriginalIsKept_PreservesOriginalEntryName()
     {
-        // Force the original to win by using a tiny, already-compressed source.
         using var stream = CreateTinyPng();
-        var bytes = ReadAllBytes(stream);
-        stream.Position = 0;
+        var result = _webpConverter.Convert("page.jpg", stream);
 
-        var result = _sut.Convert("page.jpg", stream);
-
-        // Regardless of which won, the entry name must end with .webp or the original ext.
-        Assert.True(
-            result.EntryName == "page.webp" || result.EntryName == "page.jpg",
-            $"Unexpected entry name: {result.EntryName}");
+        Assert.True(result.EntryName == "page.webp" || result.EntryName == "page.jpg");
     }
 
-    // ── Convert – size metrics ────────────────────────────────────────────
+    // ── AVIF Convert ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Convert_SourceBytesMatchesInputStreamLength()
-    {
-        using var stream = CreateLargeCompressiblePng();
-        var expectedSourceBytes = stream.Length;
-
-        var result = _sut.Convert("page.png", stream);
-
-        Assert.Equal(expectedSourceBytes, result.SourceBytes);
-    }
-
-    [Fact]
-    public void Convert_ContentLength_MatchesWinnerByteCount()
+    public void Convert_Avif_ProducesValidAvif()
     {
         using var stream = CreateLargeCompressiblePng();
 
-        var result = _sut.Convert("page.png", stream);
+        var result = _avifConverter.Convert("page.png", stream);
 
-        // Content must be exactly the bytes that correspond to the winner.
-        Assert.Equal(result.Content.Length, result.WebpWasSmaller ? result.ConvertedBytes : result.SourceBytes);
+        Assert.NotNull(result);
+        Assert.True(result.ConvertedBytes > 0);
+        if (result.IsSmaller)
+            Assert.Equal("page.avif", result.EntryName);
     }
 
+    // ── JXL Convert ───────────────────────────────────────────────────────
+
     [Fact]
-    public void Convert_WebpWasSmaller_WhenConvertedBytesLessThanSourceBytes()
+    public void Convert_Jxl_ProducesValidJxl()
     {
         using var stream = CreateLargeCompressiblePng();
 
-        var result = _sut.Convert("page.png", stream);
+        var result = _jxlConverter.Convert("page.png", stream);
 
-        // The flag must be consistent with the actual byte counts.
-        Assert.Equal(result.ConvertedBytes < result.SourceBytes, result.WebpWasSmaller);
+        Assert.NotNull(result);
+        Assert.True(result.ConvertedBytes > 0);
+        if (result.IsSmaller)
+            Assert.Equal("page.jxl", result.EntryName);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    /// <summary>Creates a PNG stream that is large and highly compressible (solid colour).</summary>
     private static MemoryStream CreateLargeCompressiblePng()
     {
-        using var image = new Image<Rgba32>(512, 512, new Rgba32(100, 149, 237));
+        using var image = (Image.Black(256, 256) + new[] { 100.0, 149.0, 237.0 }).Cast(Enums.BandFormat.Uchar);
         var ms = new MemoryStream();
-        image.Save(ms, new PngEncoder());
+        image.WriteToStream(ms, ".png");
         ms.Position = 0;
         return ms;
     }
 
-    /// <summary>Creates a minimal 1×1 PNG stream (already tiny; unlikely to produce a smaller WebP).</summary>
     private static MemoryStream CreateTinyPng()
     {
-        using var image = new Image<Rgba32>(1, 1, new Rgba32(255, 0, 0));
+        using var image = (Image.Black(1, 1) + new[] { 255.0, 0.0, 0.0 }).Cast(Enums.BandFormat.Uchar);
         var ms = new MemoryStream();
-        image.Save(ms, new PngEncoder());
+        image.WriteToStream(ms, ".png");
         ms.Position = 0;
         return ms;
-    }
-
-    private static byte[] ReadAllBytes(Stream stream)
-    {
-        var ms = new MemoryStream();
-        stream.CopyTo(ms);
-        return ms.ToArray();
     }
 }

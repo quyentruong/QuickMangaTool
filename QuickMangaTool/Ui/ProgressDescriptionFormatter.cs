@@ -1,19 +1,25 @@
 static class ProgressDescriptionFormatter
 {
-    public static string Format(string status, string path, int width)
+    public const int DefaultWidth = 48;
+
+    public static string Format(string status, string path, int width = DefaultWidth)
     {
         var prefix = string.IsNullOrEmpty(status) ? string.Empty : status + ": ";
-        if (width <= 0) return prefix + path;
+        var fileName = Path.GetFileName(path);
+        var textToDisplay = string.IsNullOrEmpty(fileName) ? path : fileName;
+
+        if (width <= 0)
+            return prefix + textToDisplay;
 
         if (prefix.Length >= width)
             return prefix[..width];
 
         var remaining = width - prefix.Length;
-        string displayPath = path.Length <= remaining
-            ? path
-            : remaining > 3 ? "..." + path[^(remaining - 3)..] : path[^remaining..];
+        string display = textToDisplay.Length <= remaining
+            ? textToDisplay
+            : remaining > 3 ? "..." + textToDisplay[^(remaining - 3)..] : textToDisplay[^remaining..];
 
-        var result = prefix + displayPath;
+        var result = prefix + display;
         return result.Length < width ? result.PadRight(width) : result;
     }
 }

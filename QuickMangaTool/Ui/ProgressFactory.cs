@@ -7,7 +7,9 @@ static class ProgressFactory
             .AutoClear(false)
             .HideCompleted(false)
             .Columns(
-                new ProgressBarColumn(),
                 new SpinnerColumn(),
-                new TaskDescriptionColumn { Alignment = Justify.Left });
+                new TaskDescriptionColumn { Alignment = Justify.Left },
+                new ProgressBarColumn { Width = 32 },
+                new PercentageColumn(),
+                new ElapsedTimeColumn());
 }

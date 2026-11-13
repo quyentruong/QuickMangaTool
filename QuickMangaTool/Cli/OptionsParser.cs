@@ -1,5 +1,14 @@
 static class OptionsParser
 {
+    private static readonly HashSet<string> KnownSubcommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "convert", "compress", "pdf-to-cbz", "cbr-to-cbz", "upscale", "remove-old",
+        "read-logs", "delete-logs", "diag", "clear-cache", "update"
+    };
+
+    public static bool IsKnownSubcommand(string? arg)
+        => !string.IsNullOrWhiteSpace(arg) && KnownSubcommands.Contains(arg);
+
     /// <summary>
     /// Parses <paramref name="args"/> into <see cref="AppOptions"/>.
     /// Returns <see langword="null"/> when help was printed and the caller should exit with 0.
@@ -8,50 +17,49 @@ static class OptionsParser
     {
         args ??= [];
 
-        // If no args supplied, show help by default.
         if (args.Length == 0 || args.Contains("--help") || args.Contains("-h"))
         {
             PrintHelp(output);
             return null;
         }
 
-        var confirm  = args.Contains("--confirm")  || args.Contains("-y");
-        var dryRun   = !confirm || args.Contains("--dry-run") || args.Contains("-n");
-        var addDuplicates = args.Contains("--add-duplicates") || args.Contains("--add-dups") || args.Contains("-a");
-        var genreToTags   = args.Contains("--genre-to-tags")   || args.Contains("-g");
-        var detectUpscale = args.Contains("--detect-upscale")  || args.Contains("-u");
-        var detectDuplicates = args.Contains("--detect-duplicates") || args.Contains("--detect-dups");
-        var convertToWebp = args.Contains("--convert-to-webp")  || args.Contains("-w");
-        var pdfToCbz = args.Contains("--pdf-to-cbz");
-        var compressFolders = args.Contains("--compress-folders") || args.Contains("--compress");
-        var removeOldCbz = args.Contains("--remove-old-cbz")  || args.Contains("--remove-old");
-        var readLogs = args.Contains("--read-logs");
-        var deleteLogs = args.Contains("--delete-logs");
-        var cbrToCbz = args.Contains("--cbr-to-cbz");
+        var interactive = args.Contains("--interactive") || args.Contains("-i");
+        var confirm = args.Contains("--confirm") || args.Contains("-y");
+        var dryRun = args.Contains("--dry-run") || args.Contains("-n");
 
-        int phashThreshold = 8;
-        var tArg = args.FirstOrDefault(a => a.StartsWith("--phash-threshold="));
-        if (tArg is not null)
-        {
-            var parts = tArg.Split('=', 2);
-            if (parts.Length == 2 && int.TryParse(parts[1], out var tv) && tv >= 0)
-                phashThreshold = tv;
-        }
+        var convertImages = args.Contains("--convert") || args.Contains("--convert-to-webp") || args.Contains("-w") || args.Contains("convert");
+        var compressFolders = args.Contains("--compress-folders") || args.Contains("--compress") || args.Contains("compress");
+        var pdfToCbz = args.Contains("--pdf-to-cbz") || args.Contains("pdf-to-cbz");
+        var cbrToCbz = args.Contains("--cbr-to-cbz") || args.Contains("cbr-to-cbz");
+        var detectUpscale = args.Contains("--detect-upscale") || args.Contains("-u") || args.Contains("upscale");
+        var removeOldCbz = args.Contains("--remove-old-cbz") || args.Contains("--remove-old") || args.Contains("remove-old");
+        var readLogs = args.Contains("--read-logs") || args.Contains("read-logs");
+        var deleteLogs = args.Contains("--delete-logs") || args.Contains("delete-logs");
+        var vipsDiagnostics = args.Contains("--vips-diagnostics") || args.Contains("diag");
+        var clearCache = args.Contains("--clear-cache") || args.Contains("-c") || args.Contains("clear-cache");
+        var updateApp = args.Contains("--update") || args.Contains("update");
+        var deleteSource = args.Contains("--delete-source");
 
         int parallelism = 0;
         var pArg = args.FirstOrDefault(a => a.StartsWith("--parallel="));
         if (pArg is not null)
         {
             var parts = pArg.Split('=', 2);
-            if (parts.Length == 2 && int.TryParse(parts[1], out var pv))
+            if (parts.Length == 2 && int.TryParse(parts[1], out var pv) && pv >= 0)
                 parallelism = pv;
         }
 
-        var clearCache = args.Contains("--clear-cache") || args.Contains("-c");
+        int? effort = null;
+        var effortArg = args.FirstOrDefault(a => a.StartsWith("--effort="));
+        if (effortArg is not null)
+        {
+            var parts = effortArg.Split('=', 2);
+            if (parts.Length == 2 && int.TryParse(parts[1], out var ev) && ev >= 0)
+                effort = ev;
+        }
 
-        var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-'));
+        var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-') && !KnownSubcommands.Contains(a));
 
-        // Image format (webp or avif). Default is webp.
         var imageFormat = ImageFormat.Webp;
         var fArg = args.FirstOrDefault(a => a.StartsWith("--image-format="));
         if (fArg is not null)
@@ -61,14 +69,16 @@ static class OptionsParser
             {
                 var v = parts[1].ToLowerInvariant();
                 if (v == "avif") imageFormat = ImageFormat.Avif;
+                else if (v == "jxl") imageFormat = ImageFormat.Jxl;
                 else imageFormat = ImageFormat.Webp;
             }
         }
 
-        // If the user supplied only a path but no feature flags, show help instead
-        // of running a no-op. Valid feature flags are --genre-to-tags, --detect-upscale,
-        // compress-folders, pdf-to-cbz and the standalone log commands.
-        if (directoryArg is not null && !(addDuplicates || genreToTags || detectUpscale || detectDuplicates || compressFolders || convertToWebp || removeOldCbz || pdfToCbz || cbrToCbz || clearCache || readLogs || deleteLogs))
+        bool hasAction = convertImages || compressFolders || pdfToCbz || cbrToCbz ||
+                         detectUpscale || removeOldCbz || readLogs || deleteLogs ||
+                         vipsDiagnostics || clearCache || updateApp || interactive;
+
+        if (!hasAction)
         {
             PrintHelp(output);
             return null;
@@ -76,49 +86,66 @@ static class OptionsParser
 
         var directory = directoryArg ?? Directory.GetCurrentDirectory();
 
-        return new AppOptions(directory, dryRun, addDuplicates, genreToTags, detectUpscale, detectDuplicates, compressFolders, convertToWebp, imageFormat, removeOldCbz, readLogs, deleteLogs, pdfToCbz, cbrToCbz, parallelism, phashThreshold, clearCache);
+        return new AppOptions(
+            Directory: directory,
+            DryRun: dryRun,
+            Confirm: confirm,
+            Interactive: interactive,
+            DetectUpscale: detectUpscale,
+            CompressFolders: compressFolders,
+            ConvertImages: convertImages,
+            ImageFormat: imageFormat,
+            RemoveOldCbz: removeOldCbz,
+            DeleteSource: deleteSource,
+            ReadLogs: readLogs,
+            DeleteLogs: deleteLogs,
+            VipsDiagnostics: vipsDiagnostics,
+            PdfToCbz: pdfToCbz,
+            CbrToCbz: cbrToCbz,
+            Parallelism: parallelism,
+            Effort: effort,
+            ClearCache: clearCache,
+            UpdateApp: updateApp);
     }
 
     private static void PrintHelp(TextWriter output)
     {
-        output.WriteLine("Usage: QuickMangaTool [path] [options]");
+        output.WriteLine("Usage: QuickMangaTool [path] [command|options]");
+        output.WriteLine();
+        output.WriteLine("Commands & Operations:");
+        output.WriteLine("  convert, -w, --convert-to-webp    Convert images inside .cbz to WebP/AVIF/JXL (when smaller)");
+        output.WriteLine("  compress, --compress-folders      Compress subfolders into individual .cbz archives");
+        output.WriteLine("  pdf-to-cbz, --pdf-to-cbz          Extract images from PDF files into .cbz archives");
+        output.WriteLine("  cbr-to-cbz, --cbr-to-cbz          Convert .cbr archives to .cbz");
+        output.WriteLine("  upscale, -u, --detect-upscale     Analyze .cbz image quality (dimensions, DPI, blur, noise)");
+        output.WriteLine("  remove-old, --remove-old-cbz      Delete leftover .old.cbz backup files");
+        output.WriteLine("  read-logs, --read-logs            Interactively view run log files");
+        output.WriteLine("  delete-logs, --delete-logs        Delete all .log files in the target directory");
+        output.WriteLine("  diag, --vips-diagnostics          Print NetVips & libvips configuration and supported codecs");
+        output.WriteLine("  clear-cache, -c, --clear-cache    Clear the skip cache (~/.quickmangatool/skipcache.dat)");
+        output.WriteLine("  update, --update                  Check and update QuickMangaTool from GitHub Releases");
         output.WriteLine();
         output.WriteLine("Options:");
-        output.WriteLine("  --help, -h       Show this help and exit");
-        output.WriteLine("  --dry-run, -n    Run in dry-run mode (no changes). This is the default");
-        output.WriteLine("  --confirm, -y    Apply changes to .cbz files (must be provided to modify archives)");
-        output.WriteLine("  --add-duplicates, --add-dups, -a  Scan image files and add their pHash values to duplicates.db next to the executable");
-        output.WriteLine("  --genre-to-tags, -g      Apply Genre -> Tags transformation to XML metadata inside archives");
-        output.WriteLine("  --detect-upscale, -u     Analyze images inside .cbz and report which archives need upscaling");
-        output.WriteLine("  --detect-duplicates      Scan .cbz archives and detect duplicate images using duplicates.db and pHash similarity");
-        output.WriteLine("  --convert-to-webp, -w    Convert image entries inside .cbz archives to .webp");
-        output.WriteLine("  --image-format=webp|avif  Choose output image format when converting or compressing (default: webp)");
-        output.WriteLine("  --compress-folders, --compress    Compress all subfolders under the given path into individual .cbz files");
-        output.WriteLine("  --pdf-to-cbz             Scan a folder for PDF files and produce a .cbz next to each PDF (non-recursive, skips existing .cbz)");
-        output.WriteLine("  --cbr-to-cbz             Scan a folder recursively for .cbr files and produce a .cbz next to each CBR");
-        output.WriteLine("  --remove-old-cbz         Remove .old backup files (standalone or combined with --convert-to-webp)");
-        output.WriteLine("                             Standalone: deletes leftover .cbz.old files from a previous conversion run");
-        output.WriteLine("  --read-logs               Print all .log files found under the given path to the console");
-        output.WriteLine("  --delete-logs             Delete all .log files found under the given path");
-        output.WriteLine("  --parallel=N             Set parallel worker count for detection (default = tuned for disk)");
-        output.WriteLine("  --phash-threshold=N      Maximum Hamming distance for pHash duplicate matching (default: 8)");
-        output.WriteLine("  --clear-cache, -c        Remove the cached list of previously-clean archives and exit");
+        output.WriteLine("  -i, --interactive                 Open interactive menu (default when run without arguments in terminal)");
+        output.WriteLine("  -n, --dry-run                     Preview changes without modifying .cbz archives (convert command)");
+        output.WriteLine("  -y, --confirm                     Apply deletions or confirm prompts without asking");
+        output.WriteLine("  --delete-source                   Delete original file/folder after successful .cbz creation");
+        output.WriteLine("  --image-format=webp|avif|jxl      Target image format (default: webp)");
+        output.WriteLine("  --effort=N                        Encoder effort level (WebP: 0-6, JXL: 1-9, AVIF: 0-9)");
+        output.WriteLine("  --parallel=N                      Number of parallel workers (default: tuned for CPU/IO)");
+        output.WriteLine("  -h, --help                        Show this help message");
         output.WriteLine();
         output.WriteLine("Examples:");
-        output.WriteLine("  QuickMangaTool.exe            Run dry-run in current directory (default)");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga -n  Dry-run in C:\\manga");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga -y  Actually apply changes in C:\\manga");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -n       Dry-run WebP conversion with size diff");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y       Convert images to WebP and keep .old backup");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif -w -y   Convert images to AVIF instead of WebP");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --image-format=avif --compress-folders -y   Compress all subfolders and store images as AVIF");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --pdf-to-cbz --image-format=avif -y   Extract PDFs and convert embedded images to AVIF in produced .cbz files");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --compress-folders -y --parallel=4   Compress folders using 4 workers (tune with --parallel)");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga -w -y --remove-old-cbz  Convert and delete .old backup");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --add-duplicates -y  Add image pHash values to duplicates.db");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --detect-duplicates --phash-threshold=8  Detect duplicates in archives");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --read-logs  Print logs under C:\\manga");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --delete-logs  Delete logs under C:\\manga");
-        output.WriteLine("  QuickMangaTool.exe C:\\manga --cbr-to-cbz  Recursively convert .cbr archives to .cbz");
+        output.WriteLine("  QuickMangaTool                                    Launch interactive menu");
+        output.WriteLine("  QuickMangaTool /path/to/manga convert             Convert images to WebP");
+        output.WriteLine("  QuickMangaTool /path/to/manga convert --dry-run   Preview WebP conversion size delta");
+        output.WriteLine("  QuickMangaTool /path/to/manga convert --image-format=avif --effort=4");
+        output.WriteLine("  QuickMangaTool /path/to/manga convert --image-format=jxl --effort=7");
+        output.WriteLine("  QuickMangaTool /path/to/folders compress --delete-source");
+        output.WriteLine("  QuickMangaTool /path/to/pdfs pdf-to-cbz --delete-source");
+        output.WriteLine("  QuickMangaTool /path/to/cbrs cbr-to-cbz --delete-source");
+        output.WriteLine("  QuickMangaTool /path/to/manga upscale");
+        output.WriteLine("  QuickMangaTool /path/to/manga remove-old -y");
+        output.WriteLine("  QuickMangaTool --vips-diagnostics");
     }
 }

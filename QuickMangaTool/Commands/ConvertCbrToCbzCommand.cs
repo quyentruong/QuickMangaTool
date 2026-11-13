@@ -40,8 +40,7 @@ internal sealed class SpectreConsoleCbrConversionProgressReporter : ICbrConversi
 
         public void Update(string status, string path)
         {
-            const int descriptionWidth = 100;
-            _task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(status, path, descriptionWidth));
+            _task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(status, Path.GetFileName(path)));
         }
 
         public void Increment() => _task.Increment(1);
@@ -79,17 +78,23 @@ class ConvertCbrToCbzCommand : IAppCommand
     private readonly string _root;
     private readonly ICbrArchiveReader _reader;
     private readonly ICbrConversionProgressReporter _progressReporter;
+    private readonly bool _deleteSource;
 
-    public ConvertCbrToCbzCommand(string root)
-        : this(root, new SharpCompressCbrArchiveReader(), new SpectreConsoleCbrConversionProgressReporter())
+    public ConvertCbrToCbzCommand(string root, bool deleteSource = false)
+        : this(root, new SharpCompressCbrArchiveReader(), new SpectreConsoleCbrConversionProgressReporter(), deleteSource)
     {
     }
 
-    internal ConvertCbrToCbzCommand(string root, ICbrArchiveReader reader, ICbrConversionProgressReporter progressReporter)
+    internal ConvertCbrToCbzCommand(
+        string root,
+        ICbrArchiveReader reader,
+        ICbrConversionProgressReporter progressReporter,
+        bool deleteSource = false)
     {
         _root = root;
         _reader = reader;
         _progressReporter = progressReporter;
+        _deleteSource = deleteSource;
     }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
@@ -142,6 +147,12 @@ class ConvertCbrToCbzCommand : IAppCommand
                     logger.WriteEntry(new ProcessResult(targetPath, ProcessStatus.Updated));
                     converted++;
                     progress.Update("Converted", cbrPath);
+
+                    if (_deleteSource && File.Exists(cbrPath))
+                    {
+                        try { File.Delete(cbrPath); }
+                        catch { /* best-effort cleanup */ }
+                    }
                 }
                 catch (Exception ex)
                 {

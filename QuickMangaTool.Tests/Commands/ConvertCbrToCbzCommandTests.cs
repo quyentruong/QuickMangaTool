@@ -56,6 +56,22 @@ public class ConvertCbrToCbzCommandTests : IDisposable
     }
 
     [Fact]
+    public void Execute_WithDeleteSource_DeletesOriginalCbr()
+    {
+        var rootCbr = CreateCbr("delete-me.cbr");
+        var reader = new FakeCbrArchiveReader();
+        var progress = new FakeCbrConversionProgressReporter();
+        reader.SetEntries(rootCbr, ("001.jpg", [1, 2, 3]));
+
+        var sut = new ConvertCbrToCbzCommand(_tempDir, reader, progress, deleteSource: true);
+        var result = sut.Execute(Array.Empty<string>(), new NoopRunLogger());
+
+        Assert.Equal(0, result);
+        Assert.True(File.Exists(Path.ChangeExtension(rootCbr, ".cbz")));
+        Assert.False(File.Exists(rootCbr), "Original .cbr file should be deleted when deleteSource is true");
+    }
+
+    [Fact]
     public void Execute_WhenReaderThrows_ReturnsErrorAndKeepsSuccessfulConverts()
     {
         var successCbr = CreateCbr("good.cbr");

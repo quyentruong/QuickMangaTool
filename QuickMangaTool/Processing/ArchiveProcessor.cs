@@ -1,12 +1,9 @@
 using System.IO.Compression;
-using System.Text;
-using System.Xml.Linq;
 
 class ArchiveProcessor : IArchiveProcessor
 {
     private readonly bool _dryRun;
-    private readonly IReadOnlyList<IXmlTransformation> _transformations;
-    private readonly bool _convertToWebp;
+    private readonly bool _convertImages;
     private readonly bool _removeOldCbz;
     private readonly int _parallelism;
     private readonly IArchiveImageConverter _imageConverter;
@@ -14,35 +11,113 @@ class ArchiveProcessor : IArchiveProcessor
 
     public ArchiveProcessor(
         bool dryRun,
-        IReadOnlyList<IXmlTransformation> transformations,
-        bool convertToWebp,
+        bool convertImages,
         bool removeOldCbz,
         int parallelism = 0,
         IArchiveImageConverter? imageConverter = null,
         Action<ZipArchive>? updateHook = null)
     {
         _dryRun = dryRun;
-        _transformations = transformations;
-        _convertToWebp = convertToWebp;
+        _convertImages = convertImages;
         _removeOldCbz = removeOldCbz;
         _parallelism = parallelism;
         _imageConverter = imageConverter ?? new WebpArchiveImageConverter();
         _updateHook = updateHook;
     }
 
-    public ProcessResult Process(string cbzPath)
+    public ProcessResult Process(string cbzPath, Action<int, int>? onImageProgress = null)
     {
         try
         {
             var originalSize = new FileInfo(cbzPath).Length;
 
+            if (!_convertImages)
+                return new ProcessResult(cbzPath, ProcessStatus.NoChange);
+
+            var oldPath = Path.Combine(
+                Path.GetDirectoryName(cbzPath) ?? string.Empty,
+                Path.GetFileNameWithoutExtension(cbzPath) + ".old" + Path.GetExtension(cbzPath));
+
+            // If a .old.cbz backup already exists, this file was already converted in a previous run — skip immediately.
+            if (File.Exists(oldPath))
+                return new ProcessResult(cbzPath, ProcessStatus.NoChange);
+
+            // Step 1: Read and encode images once
+            var encodeResult = ReadAndEncodeImages(cbzPath, onImageProgress);
+
+            if (encodeResult.FailedImageCount > 0)
+            {
+                return new ProcessResult(
+                    cbzPath,
+                    ProcessStatus.Error,
+                    $"Failed to convert {encodeResult.FailedImageCount} image(s).",
+                    Detail: BuildDetail(encodeResult, originalSize, null));
+            }
+
+            if (encodeResult.ConvertedKeptCount == 0)
+            {
+                // No image became smaller
+                return new ProcessResult(cbzPath, ProcessStatus.NoChange);
+            }
+
+            // Step 2: Handle dry run
             if (_dryRun)
-                return ProcessDryRun(cbzPath, originalSize);
+            {
+                return new ProcessResult(
+                    cbzPath,
+                    ProcessStatus.WouldUpdate,
+                    Detail: BuildDetail(encodeResult, originalSize, null),
+                    OriginalSizeBytes: originalSize);
+            }
 
-            if (_convertToWebp)
-                return ProcessWithBackup(cbzPath, originalSize);
+            // Step 3: Apply changes with backup
+            File.Move(cbzPath, oldPath);
+            File.Copy(oldPath, cbzPath);
 
-            return ProcessInPlace(cbzPath, originalSize);
+            try
+            {
+                using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
+                {
+                    _updateHook?.Invoke(zip);
+
+                    for (int i = 0; i < encodeResult.ConvertedEntries.Length; i++)
+                    {
+                        var (originalName, converted) = encodeResult.ConvertedEntries[i];
+                        if (converted is null || !converted.IsSmaller)
+                            continue;
+
+                        var originalEntry = zip.GetEntry(originalName);
+                        originalEntry?.Delete();
+
+                        var newEntry = zip.CreateEntry(converted.EntryName, CompressionLevel.Optimal);
+                        using var s = newEntry.Open();
+                        s.Write(converted.Content, 0, converted.Content.Length);
+                    }
+                }
+
+                var newSize = new FileInfo(cbzPath).Length;
+
+                if (_removeOldCbz && File.Exists(oldPath))
+                    File.Delete(oldPath);
+
+                return new ProcessResult(
+                    cbzPath,
+                    ProcessStatus.Updated,
+                    Detail: BuildDetail(encodeResult, originalSize, newSize),
+                    OriginalSizeBytes: originalSize,
+                    NewSizeBytes: newSize);
+            }
+            catch
+            {
+                if (File.Exists(oldPath))
+                {
+                    if (File.Exists(cbzPath))
+                        File.Delete(cbzPath);
+                    File.Copy(oldPath, cbzPath);
+                }
+
+                throw;
+            }
         }
         catch (Exception ex)
         {
@@ -50,219 +125,48 @@ class ArchiveProcessor : IArchiveProcessor
         }
     }
 
-    private ProcessResult ProcessDryRun(string cbzPath, long originalSize)
+    private sealed record EncodeResult(
+        (string OriginalName, ConvertedImage? Converted)[] ConvertedEntries,
+        int ConvertedKeptCount,
+        int OriginalKeptCount,
+        long SourceBytes,
+        long ConvertedBytes,
+        int FailedImageCount,
+        List<string> Failures,
+        int BlackWhiteCount,
+        int ColorCount);
+
+    private EncodeResult ReadAndEncodeImages(string cbzPath, Action<int, int>? onImageProgress)
     {
-        using var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Read);
-        var xmlChanged = ApplyXmlTransformations(zip, persistChanges: false);
-        var webpResult = ConvertImagesToWebp(zip, persistChanges: false);
+        List<(string EntryName, byte[] Data)> rawImages;
 
-        var changed = xmlChanged || webpResult.WebpKeptCount > 0;
-        if (!changed)
+        using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Read))
         {
-            if (webpResult.FailedImageCount > 0)
+            var candidates = zip.Entries
+                .Where(e => !string.IsNullOrWhiteSpace(e.Name))
+                .Where(e => _imageConverter.CanConvert(e.FullName))
+                .ToList();
+
+            rawImages = new List<(string EntryName, byte[] Data)>(candidates.Count);
+            foreach (var entry in candidates)
             {
-                return new ProcessResult(
-                    cbzPath,
-                    ProcessStatus.Error,
-                    $"Failed to convert {webpResult.FailedImageCount} image(s).",
-                    Detail: BuildDetail(webpResult, originalSize, null));
-            }
-
-            return new ProcessResult(cbzPath, ProcessStatus.NoChange);
-        }
-
-        return new ProcessResult(
-            cbzPath,
-            ProcessStatus.WouldUpdate,
-            Detail: BuildDetail(webpResult, originalSize, null),
-            OriginalSizeBytes: originalSize);
-    }
-
-    private ProcessResult ProcessInPlace(string cbzPath, long originalSize)
-    {
-        bool changed;
-        (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult;
-
-        using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
-        {
-            var xmlChanged = ApplyXmlTransformations(zip, persistChanges: true);
-            webpResult = ConvertImagesToWebp(zip, persistChanges: true);
-            changed = xmlChanged || webpResult.WebpKeptCount > 0;
-        } // zip disposed and flushed to disk here
-
-        if (!changed)
-        {
-            if (webpResult.FailedImageCount > 0)
-            {
-                return new ProcessResult(
-                    cbzPath,
-                    ProcessStatus.Error,
-                    $"Failed to convert {webpResult.FailedImageCount} image(s).",
-                    Detail: BuildDetail(webpResult, originalSize, null));
-            }
-
-            return new ProcessResult(cbzPath, ProcessStatus.NoChange);
-        }
-
-        var newSize = new FileInfo(cbzPath).Length;
-        return new ProcessResult(
-            cbzPath,
-            ProcessStatus.Updated,
-            Detail: BuildDetail(webpResult, originalSize, newSize),
-            OriginalSizeBytes: originalSize,
-            NewSizeBytes: newSize);
-    }
-
-    private ProcessResult ProcessWithBackup(string cbzPath, long originalSize)
-    {
-        var oldPath = Path.Combine(
-            Path.GetDirectoryName(cbzPath) ?? string.Empty,
-            Path.GetFileNameWithoutExtension(cbzPath) + ".old" + Path.GetExtension(cbzPath));
-
-        // If a .old.cbz backup already exists, this file was already converted in a previous run — skip immediately.
-        if (File.Exists(oldPath))
-            return new ProcessResult(cbzPath, ProcessStatus.NoChange);
-
-        using (var scanZip = ZipFile.Open(cbzPath, ZipArchiveMode.Read))
-        {
-            var xmlWouldChange = ApplyXmlTransformations(scanZip, persistChanges: false);
-            var webpWouldChange = ConvertImagesToWebp(scanZip, persistChanges: false);
-            var wouldChange = xmlWouldChange || webpWouldChange.WebpKeptCount > 0;
-            if (!wouldChange)
-            {
-                if (webpWouldChange.FailedImageCount > 0)
-                {
-                    return new ProcessResult(
-                        cbzPath,
-                        ProcessStatus.Error,
-                        $"Failed to convert {webpWouldChange.FailedImageCount} image(s).",
-                        Detail: BuildDetail(webpWouldChange, originalSize, null));
-                }
-
-                return new ProcessResult(cbzPath, ProcessStatus.NoChange);
+                using var source = entry.Open();
+                using var buffer = new MemoryStream();
+                source.CopyTo(buffer);
+                rawImages.Add((entry.FullName, buffer.ToArray()));
             }
         }
 
-        File.Move(cbzPath, oldPath);
-        File.Copy(oldPath, cbzPath);
-
-        try
+        if (rawImages.Count == 0)
         {
-            bool changed;
-            (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult;
-
-            using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Update))
-            {
-                // testing hook: allow injected action to run inside the update phase
-                _updateHook?.Invoke(zip);
-
-                var xmlChanged = ApplyXmlTransformations(zip, persistChanges: true);
-                webpResult = ConvertImagesToWebp(zip, persistChanges: true);
-                changed = xmlChanged || webpResult.WebpKeptCount > 0;
-            } // zip disposed and flushed to disk here
-
-            if (!changed)
-            {
-                if (webpResult.FailedImageCount > 0)
-                {
-                    return new ProcessResult(
-                        cbzPath,
-                        ProcessStatus.Error,
-                        $"Failed to convert {webpResult.FailedImageCount} image(s).",
-                        Detail: BuildDetail(webpResult, originalSize, null));
-                }
-
-                return new ProcessResult(cbzPath, ProcessStatus.NoChange);
-            }
-
-            var newSize = new FileInfo(cbzPath).Length;
-
-            if (_removeOldCbz && File.Exists(oldPath))
-                File.Delete(oldPath);
-
-            return new ProcessResult(
-                cbzPath,
-                ProcessStatus.Updated,
-                Detail: BuildDetail(webpResult, originalSize, newSize),
-                OriginalSizeBytes: originalSize,
-                NewSizeBytes: newSize);
-        }
-        catch
-        {
-            if (File.Exists(oldPath))
-            {
-                if (File.Exists(cbzPath))
-                    File.Delete(cbzPath);
-                File.Copy(oldPath, cbzPath);
-            }
-
-            throw;
-        }
-    }
-
-    private bool ApplyXmlTransformations(ZipArchive zip, bool persistChanges)
-    {
-        var comicEntries = zip.Entries
-            .Where(e => Path.GetFileName(e.FullName).Equals("ComicInfo.xml", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        bool changed = false;
-        foreach (var entry in comicEntries)
-        {
-            string xmlText;
-            using (var reader = new StreamReader(entry.Open(), Encoding.UTF8, true))
-                xmlText = reader.ReadToEnd();
-
-            var doc = XDocument.Parse(xmlText);
-
-            bool transformApplied = false;
-            foreach (var t in _transformations)
-                transformApplied |= t.Apply(doc);
-
-            if (!transformApplied)
-                continue;
-
-            changed = true;
-
-            if (persistChanges)
-            {
-                var entryName = entry.FullName;
-                entry.Delete();
-                using var s = zip.CreateEntry(entryName, CompressionLevel.Optimal).Open();
-                doc.Save(s);
-            }
+            return new EncodeResult(
+                Array.Empty<(string, ConvertedImage?)>(),
+                0, 0, 0, 0, 0, new List<string>(), 0, 0);
         }
 
-        return changed;
-    }
-
-    private (int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) ConvertImagesToWebp(ZipArchive zip, bool persistChanges)
-    {
-        if (!_convertToWebp)
-            return (0, 0, 0, 0, 0, []);
-
-        var candidates = zip.Entries
-            .Where(e => !string.IsNullOrWhiteSpace(e.Name))
-            .Where(e => _imageConverter.CanConvert(e.FullName))
-            .ToList();
-
-        // Step 1: read all image bytes sequentially — ZipArchive is not thread-safe.
-        // CompressedLength is intentionally NOT used here; accessing it after Open() in
-        // ZipArchiveMode.Update throws "Length properties are unavailable once an entry
-        // has been opened for writing".
-        var rawImages = new List<(string EntryName, byte[] Data)>(candidates.Count);
-        foreach (var entry in candidates)
-        {
-            using var source = entry.Open();
-            using var buffer = new MemoryStream();
-            source.CopyTo(buffer);
-            rawImages.Add((entry.FullName, buffer.ToArray()));
-        }
-
-        // Step 2: encode all images to WebP in parallel — CPU-bound work.
-        // The converter decides per image which format is smaller and returns that one.
         int cpuWorkers = WorkerCount.ResolveCpuBound(_parallelism);
         var converted = new (ConvertedImage? Result, string? Error)[rawImages.Count];
+        int completedCount = 0;
 
         Parallel.For(0, rawImages.Count, new ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
         {
@@ -276,62 +180,75 @@ class ArchiveProcessor : IArchiveProcessor
             {
                 converted[i] = (null, $"{entryName}: {ex.Message}");
             }
+            finally
+            {
+                var done = Interlocked.Increment(ref completedCount);
+                onImageProgress?.Invoke(done, rawImages.Count);
+            }
         });
 
-        // Step 3: write results back to zip sequentially, then count outcomes.
-        // An entry is only replaced when the winning format differs from the original
-        // (i.e. WebP won). When the original is smaller, the entry is left untouched.
-        int webpKeptCount = 0;
+        int convertedKeptCount = 0;
         int originalKeptCount = 0;
         long sourceBytes = 0;
         long convertedBytes = 0;
         int failedCount = 0;
         var failures = new List<string>();
+        int blackWhiteCount = 0;
+        int colorCount = 0;
+
+        var entries = new (string OriginalName, ConvertedImage? Converted)[rawImages.Count];
 
         for (int i = 0; i < converted.Length; i++)
         {
             var (result, error) = converted[i];
+            var originalName = rawImages[i].EntryName;
 
-            if (error is not null)
+            if (error is not null || result is null)
             {
                 failedCount++;
                 if (failures.Count < 5)
-                    failures.Add(error);
+                    failures.Add(error ?? $"{originalName}: Unknown error");
+                entries[i] = (originalName, null);
                 continue;
             }
 
-            sourceBytes += result!.SourceBytes;
+            sourceBytes += result.SourceBytes;
             convertedBytes += result.ConvertedBytes;
 
-            if (result.WebpWasSmaller)
-                webpKeptCount++;
+            if (result.IsSmaller)
+                convertedKeptCount++;
             else
                 originalKeptCount++;
 
-            if (!persistChanges)
-                continue;
+            if (result.IsBlackAndWhite)
+                blackWhiteCount++;
+            else
+                colorCount++;
 
-            if (!result.WebpWasSmaller)
-                continue; // original is already in the archive, no write needed
-
-            // WebP is smaller: replace the original entry with the WebP one
-            var originalEntry = zip.GetEntry(rawImages[i].EntryName);
-            originalEntry?.Delete();
-            using var output = zip.CreateEntry(result.EntryName, CompressionLevel.Optimal).Open();
-            output.Write(result.Content, 0, result.Content.Length);
+            entries[i] = (originalName, result);
         }
 
-        return (webpKeptCount, originalKeptCount, sourceBytes, convertedBytes, failedCount, failures);
+        return new EncodeResult(
+            entries,
+            convertedKeptCount,
+            originalKeptCount,
+            sourceBytes,
+            convertedBytes,
+            failedCount,
+            failures,
+            blackWhiteCount,
+            colorCount);
     }
 
-    private static string BuildDetail((int WebpKeptCount, int OriginalKeptCount, long SourceBytes, long ConvertedBytes, int FailedImageCount, List<string> Failures) webpResult, long originalSize, long? newSize)
+    private static string BuildDetail(EncodeResult encodeResult, long originalSize, long? newSize)
     {
         var lines = new List<string>();
-        int totalProcessed = webpResult.WebpKeptCount + webpResult.OriginalKeptCount;
+        int totalProcessed = encodeResult.ConvertedKeptCount + encodeResult.OriginalKeptCount;
 
         if (totalProcessed > 0)
         {
-            lines.Add($"Images processed: {totalProcessed}  (WebP kept: {webpResult.WebpKeptCount}  ·  Original kept (smaller): {webpResult.OriginalKeptCount})");
+            lines.Add($"Images processed: {totalProcessed}  (Converted kept: {encodeResult.ConvertedKeptCount}  ·  Original kept (smaller): {encodeResult.OriginalKeptCount})");
+            lines.Add($"Black & White: {encodeResult.BlackWhiteCount}  ·  Color: {encodeResult.ColorCount}");
             lines.Add($"Original size:    {SizeFormatter.FormatSize(originalSize)}");
 
             if (newSize is not null)
@@ -346,15 +263,13 @@ class ArchiveProcessor : IArchiveProcessor
             lines.Add("No images were processed.");
         }
 
-        if (webpResult.FailedImageCount > 0)
+        if (encodeResult.FailedImageCount > 0)
         {
-            lines.Add($"Failed images: {webpResult.FailedImageCount}");
-            foreach (var failure in webpResult.Failures)
+            lines.Add($"Failed images: {encodeResult.FailedImageCount}");
+            foreach (var failure in encodeResult.Failures)
                 lines.Add($"  {failure}");
         }
 
         return string.Join(Environment.NewLine, lines);
     }
-
-    
 }

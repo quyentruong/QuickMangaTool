@@ -51,7 +51,6 @@ class UpscaleScanCommand : IAppCommand
         ProgressFactory.Create().Start(ctx =>
         {
             var task = ctx.AddTask("Scanning .cbz files", maxValue: cbzFiles.Count);
-            const int descriptionWidth = 100;
 
             foreach (var r in results.GetConsumingEnumerable())
             {
@@ -60,10 +59,10 @@ class UpscaleScanCommand : IAppCommand
                 string label = r.Error is not null
                     ? "Error"
                     : needsUpscale
-                        ? "Would update"
-                        : "No change";
+                        ? "Needs Upscale"
+                        : "Clean";
 
-                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(label, r.Path, descriptionWidth));
+                task.Description = Markup.Escape(ProgressDescriptionFormatter.Format(label, r.Path));
 
                 if (r.Error is not null)
                     AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(r.Path)} - {Markup.Escape(r.Error)}");

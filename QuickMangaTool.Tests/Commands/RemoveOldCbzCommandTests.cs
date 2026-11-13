@@ -156,6 +156,18 @@ public class RemoveOldCbzCommandTests : IDisposable
         _loggerMock.Verify(l => l.WriteEntry(It.IsAny<ProcessResult>()), Times.Exactly(2));
     }
 
+    [Fact]
+    public void Execute_WithConfirmTrue_AndDirectoryDiscovery_DeletesDirectly()
+    {
+        var oldPath = CreateOldCbz("discovered.cbz");
+        var sut = new RemoveOldCbzCommand(_tempDir, confirm: true);
+
+        var result = sut.Execute(Array.Empty<string>(), _loggerMock.Object);
+
+        Assert.Equal(0, result);
+        Assert.False(File.Exists(oldPath));
+    }
+
     // ── Mixed: some .old.cbz files present, some not ─────────────────────
 
     [Fact]

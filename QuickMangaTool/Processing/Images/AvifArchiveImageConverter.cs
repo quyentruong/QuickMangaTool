@@ -1,48 +1,35 @@
-using ImageMagick;
+using NetVips;
 
-class AvifArchiveImageConverter : IArchiveImageConverter
+class AvifArchiveImageConverter(int bwQuality = 62, int colorQuality = 70, int effort = 3) : IArchiveImageConverter
 {
-    private static readonly HashSet<string> SupportedExtensions =
-    [
-        ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff"
-    ];
+    private readonly int _bwQuality = bwQuality;
+    private readonly int _colorQuality = colorQuality;
+    private readonly int _effort = effort;
 
-    private readonly int _quality;
-
-    public AvifArchiveImageConverter(int quality = 65)
-    {
-        _quality = quality;
-    }
-
-    public bool CanConvert(string entryName)
-    {
-        var extension = Path.GetExtension(entryName).ToLowerInvariant();
-        return SupportedExtensions.Contains(extension);
-    }
+    public bool CanConvert(string entryName) => ImageExtensions.CanConvert(entryName);
 
     public ConvertedImage Convert(string entryName, Stream input)
     {
-        // Read source into memory (ZipArchive operations keep reads sequential)
-        using var sourceBuffer = new MemoryStream();
-        input.CopyTo(sourceBuffer);
-        var sourceBytes = sourceBuffer.Length;
-        var sourceData = sourceBuffer.ToArray();
+        var sourceData = StreamByteReader.Read(input, out var sourceBytes);
 
-        // Use Magick.NET to encode to AVIF
-        using var img = new MagickImage(sourceData);
+        // 1. Phân loại màu cực nhanh bằng thumbnail nhỏ (128x128) để tránh quét hàng triệu pixel ảnh gốc
+        var isBlackAndWhite = ImageColorClassifier.IsBlackAndWhite(sourceData);
 
-        // Set quality (0-100)
-        img.Quality = (uint)_quality;
+        // 2. Nạp ảnh gốc để encode
+        using var img = Image.NewFromBuffer(sourceData, string.Empty);
+        using var imageToEncode = isBlackAndWhite ? img.Colourspace(Enums.Interpretation.Bw) : null;
+        var targetImg = imageToEncode ?? img;
 
-        using var output = new MemoryStream();
-        img.Write(output, MagickFormat.Avif);
+        // 3. Encode AVIF
+        var avifSaveOptions = isBlackAndWhite
+            ? $".avif[Q={_bwQuality},compression=av1,effort={_effort}]"
+            : $".avif[Q={_colorQuality},compression=av1,effort={_effort},subsample_mode=off]";
 
-        var avifBytes = output.ToArray();
-
-        bool avifWasSmaller = avifBytes.Length < sourceBytes;
+        var avifBytes = targetImg.WriteToBuffer(avifSaveOptions);
+        var avifWasSmaller = avifBytes.Length < sourceBytes;
 
         return avifWasSmaller
-            ? new ConvertedImage(Path.ChangeExtension(entryName, ".avif"), avifBytes, sourceBytes, avifBytes.Length, WebpWasSmaller: true)
-            : new ConvertedImage(entryName, sourceData, sourceBytes, avifBytes.Length, WebpWasSmaller: false);
+            ? new ConvertedImage(Path.ChangeExtension(entryName, ".avif"), avifBytes, sourceBytes, avifBytes.Length, IsSmaller: true, IsBlackAndWhite: isBlackAndWhite)
+            : new ConvertedImage(entryName, sourceData, sourceBytes, avifBytes.Length, IsSmaller: false, IsBlackAndWhite: isBlackAndWhite);
     }
 }

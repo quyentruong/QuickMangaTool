@@ -1,24 +1,30 @@
 enum ImageFormat
 {
     Webp,
-    Avif
+    Avif,
+    Jxl
 }
 
 record AppOptions(
     string Directory,
     bool DryRun,
-    bool AddDuplicates,
-    bool GenreToTags,
+    bool Confirm,
+    bool Interactive,
     bool DetectUpscale,
-    bool DetectDuplicates,
     bool CompressFolders,
-    bool ConvertToWebp,
+    bool ConvertImages,
     ImageFormat ImageFormat,
     bool RemoveOldCbz,
+    bool DeleteSource,
     bool ReadLogs,
     bool DeleteLogs,
+    bool VipsDiagnostics,
     bool PdfToCbz,
     bool CbrToCbz,
     int Parallelism,
-    int PhashThreshold,
-    bool ClearCache);
+    int? Effort,
+    bool ClearCache,
+    bool UpdateApp = false)
+{
+    public bool ConvertToWebp => ConvertImages;
+}

@@ -1,12 +1,24 @@
 name: Build
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.1.0). Leave empty to auto-generate v1.0.<run_number>'
+        required: false
+        type: string
 
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
 
     strategy:
       matrix:
@@ -16,29 +28,87 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
+    - name: Resolve version
+      id: version
+      shell: bash
+      run: |
+        if [ "${{ github.ref_type }}" = "tag" ]; then
+          TAG="${{ github.ref_name }}"
+        elif [ -n "${{ inputs.version }}" ]; then
+          RAW_VER="${{ inputs.version }}"
+          if [[ "$RAW_VER" == v* || "$RAW_VER" == V* ]]; then
+            TAG="v${RAW_VER:1}"
+          else
+            TAG="v${RAW_VER}"
+          fi
+        else
+          TAG="v1.0.${{ github.run_number }}"
+        fi
+        VERSION_NUM="${TAG#v}"
+        VERSION_NUM="${VERSION_NUM%%-*}"
+        echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+        echo "version=${VERSION_NUM}" >> "$GITHUB_OUTPUT"
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '10.0.x'
 
+    - name: Install libvips
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libvips libvips-dev libvips-tools
+
     - name: Restore dependencies
-      run: dotnet restore QuickMangaTool/QuickMangaTool.csproj
+      run: dotnet restore QuickMangaTool.slnx
+
+    - name: Build
+      run: dotnet build QuickMangaTool.slnx --configuration Release --no-restore
 
     - name: Run tests
       id: test
-      run: dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release
-
-    - name: Build
-      run: dotnet build QuickMangaTool/QuickMangaTool.csproj --configuration Release --no-restore
+      run: |
+        set -e
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Commands'
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Processing'
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Cli'
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Logging'
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Storage'
+        dotnet test QuickMangaTool.Tests/QuickMangaTool.Tests.csproj --configuration Release --no-build --filter 'FullyQualifiedName~QuickMangaTool.Tests.Utilities'
 
     - name: Publish (${{ matrix.runtime }})
       if: ${{ steps.test.outcome == 'success' }}
-      run: >
-        dotnet publish QuickMangaTool/QuickMangaTool.csproj --configuration Release --runtime ${{ matrix.runtime }} --output publish/${{ matrix.runtime }}
+      run: |
+        dotnet publish QuickMangaTool/QuickMangaTool.csproj --configuration Release --runtime ${{ matrix.runtime }} -p:Version=${{ steps.version.outputs.version }} -p:InformationalVersion=${{ steps.version.outputs.tag }} --output publish/${{ matrix.runtime }}
+        mkdir -p release-assets
+        if [ "${{ matrix.runtime }}" = "win-x64" ]; then
+          cp "publish/${{ matrix.runtime }}/QuickMangaTool.exe" "release-assets/QuickMangaTool-win-x64.exe"
+        else
+          cp "publish/${{ matrix.runtime }}/QuickMangaTool" "release-assets/QuickMangaTool-linux-x64"
+        fi
 
     - name: Upload artifact (${{ matrix.runtime }})
       if: ${{ steps.test.outcome == 'success' }}
       uses: actions/upload-artifact@v7
       with:
         name: QuickMangaTool-${{ matrix.runtime }}
-        path: publish/${{ matrix.runtime }}/
+        path: release-assets/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download release assets
+      uses: actions/download-artifact@v7
+      with:
+        path: release-assets
+        merge-multiple: true
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ needs.build.outputs.tag }}
+        name: QuickMangaTool ${{ needs.build.outputs.tag }}
+        generate_release_notes: true
+        files: release-assets/*

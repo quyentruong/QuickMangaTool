@@ -1,6 +1,6 @@
 /// <summary>
 /// Analyzes quality metrics from a decoded image stream.
-/// Implementations must handle PNG, JPEG, and WEBP formats via SixLabors.ImageSharp.
+/// Implementations must handle PNG, JPEG, and WEBP formats via NetVips.
 /// </summary>
 interface IImageQualityAnalyzer
 {
