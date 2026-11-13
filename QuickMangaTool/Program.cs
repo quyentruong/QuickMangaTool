@@ -36,7 +36,9 @@ class Program
 
             try
             {
-                ExecuteOptions(options);
+                int exitCode = ExecuteOptions(options);
+                if (options.UninstallApp)
+                    return exitCode;
             }
             catch (Exception ex)
             {
@@ -75,6 +77,9 @@ class Program
         // Standalone commands that do not produce batch log files and don't strictly require target directory to exist
         if (options.UpdateApp)
             return new UpdateCommand(options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
+
+        if (options.UninstallApp)
+            return new UninstallCommand(options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
 
         if (options.VipsDiagnostics)
             return new VipsDiagnosticCommand().Execute(Array.Empty<string>(), new NoopRunLogger());

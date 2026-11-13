@@ -279,6 +279,23 @@ public class OptionsParserTests
         Assert.True(options.Confirm);
     }
 
+    [Fact]
+    public void UninstallArgs_AreNotRecognizedFromCli()
+    {
+        Assert.False(OptionsParser.IsKnownSubcommand("uninstall"));
+
+        var (subcommandOptions, subcommandOutput) = ParseWithOutput("uninstall");
+        Assert.Null(subcommandOptions);
+        Assert.Contains("Usage:", subcommandOutput);
+
+        var (flagOptions, flagOutput) = ParseWithOutput("--uninstall");
+        Assert.Null(flagOptions);
+        Assert.Contains("Usage:", flagOutput);
+
+        var (confirmedFlagOptions, _) = ParseWithOutput("--uninstall", "-y");
+        Assert.Null(confirmedFlagOptions);
+    }
+
     // ── ImageFormat & Effort ──────────────────────────────────────────────
 
     [Fact]

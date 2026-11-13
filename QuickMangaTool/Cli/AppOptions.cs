@@ -24,7 +24,8 @@ record AppOptions(
     int Parallelism,
     int? Effort,
     bool ClearCache,
-    bool UpdateApp = false)
+    bool UpdateApp = false,
+    bool UninstallApp = false)
 {
     public bool ConvertToWebp => ConvertImages;
 }

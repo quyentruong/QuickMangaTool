@@ -29,7 +29,7 @@ static class InteractiveMenu
             var action = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("[bold yellow]Chọn tác vụ cần thực hiện / Select operation:[/]")
-                    .PageSize(15)
+                    .PageSize(16)
                     .AddChoices(new[]
                     {
                         "1. 🔄 Chuyển đổi ảnh trong .cbz (WebP / AVIF / JXL)",
@@ -44,6 +44,7 @@ static class InteractiveMenu
                         "10. ⚙️ Kiểm tra cấu hình libvips & Đường dẫn lưu trữ (Diagnostics)",
                         "11. 🧼 Xóa bộ nhớ đệm (Clear Skip Cache)",
                         "12. 🚀 Kiểm tra & Cập nhật ứng dụng (Update App)",
+                        "13. ⚠️ Gỡ cài đặt ứng dụng (Uninstall App)",
                         "0. 🚪 Thoát (Exit)"
                     }));
 
@@ -74,6 +75,44 @@ static class InteractiveMenu
             if (action.StartsWith("12."))
             {
                 return CreateDefaultOptions(currentDir) with { UpdateApp = true };
+            }
+
+            if (action.StartsWith("13."))
+            {
+                var configDir = AppPaths.GetConfigDirectory();
+                var cacheDir = AppPaths.GetCacheDirectory();
+                var logsDir = AppPaths.GetLogsDirectory();
+                var exePath = Environment.ProcessPath ?? "(không xác định)";
+
+                var warningBody = new Markup(
+                    "[bold red]Toàn bộ dữ liệu và file thực thi sau đây sẽ bị xóa vĩnh viễn:[/]\n\n" +
+                    $"[bold]• Config     :[/] [yellow]{Markup.Escape(configDir)}[/]\n" +
+                    $"[bold]• Cache      :[/] [yellow]{Markup.Escape(cacheDir)}[/]\n" +
+                    $"[bold]• Logs       :[/] [yellow]{Markup.Escape(logsDir)}[/]\n" +
+                    $"[bold]• Executable :[/] [yellow]{Markup.Escape(exePath)}[/]");
+
+                var warningPanel = new Panel(warningBody)
+                    .Header("[bold red] ⚠️ CẢNH BÁO GỠ CÀI ĐẶT (UNINSTALL) [/]")
+                    .Border(BoxBorder.Double)
+                    .BorderColor(Color.Red);
+
+                AnsiConsole.WriteLine();
+                AnsiConsole.Write(warningPanel);
+                AnsiConsole.WriteLine();
+
+                bool confirmUninstall = AnsiConsole.Confirm(
+                    "[bold red]CẢNH BÁO: Hành động này không thể hoàn tác. Bạn có chắc chắn muốn gỡ cài đặt QuickMangaTool không?[/]",
+                    false);
+
+                if (!confirmUninstall)
+                {
+                    AnsiConsole.MarkupLine("[yellow]Đã hủy gỡ cài đặt.[/]");
+                    AnsiConsole.MarkupLine("[dim]Bấm phím bất kỳ để quay lại menu chính...[/]");
+                    Console.ReadKey(true);
+                    continue;
+                }
+
+                return CreateDefaultOptions(currentDir) with { UninstallApp = true, Confirm = true };
             }
 
             if (action.StartsWith("8."))
