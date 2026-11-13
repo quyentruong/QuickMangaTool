@@ -23,6 +23,7 @@ static class InteractiveMenu
             var summary = FolderNavigationHelper.GetDirectorySummary(currentDir);
             AnsiConsole.MarkupLine($"[bold]Thư mục làm việc:[/] [yellow]{Markup.Escape(currentDir)}[/]");
             AnsiConsole.MarkupLine($"[dim]Thống kê:[/] [italic]{Markup.Escape(summary.ToDisplayString())}[/]");
+            AnsiConsole.MarkupLine($"[dim]Thư mục Logs:[/] [grey]{Markup.Escape(AppPaths.GetLogsDirectory())}[/]");
             AnsiConsole.WriteLine();
 
             var action = AnsiConsole.Prompt(
@@ -40,7 +41,7 @@ static class InteractiveMenu
                         "7. 📁 Đổi thư mục làm việc / Duyệt thư mục (Folder Browser)...",
                         "8. 📜 Xem nhật ký chạy (Read Logs)",
                         "9. 🗑️ Xóa nhật ký chạy (Delete Logs)",
-                        "10. ⚙️ Kiểm tra cấu hình libvips (VIPS Diagnostics)",
+                        "10. ⚙️ Kiểm tra cấu hình libvips & Đường dẫn lưu trữ (Diagnostics)",
                         "11. 🧼 Xóa bộ nhớ đệm (Clear Skip Cache)",
                         "12. 🚀 Kiểm tra & Cập nhật ứng dụng (Update App)",
                         "0. 🚪 Thoát (Exit)"

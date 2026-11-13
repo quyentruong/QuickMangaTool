@@ -6,42 +6,22 @@ using System.Globalization;
 
 class ReadLogsCommand : IAppCommand
 {
-    private readonly string _root;
+    private readonly string _logsDir;
 
-    public ReadLogsCommand(string root) => _root = root;
+    public ReadLogsCommand(string? logsDir = null)
+        => _logsDir = string.IsNullOrWhiteSpace(logsDir) ? AppPaths.GetLogsDirectory() : logsDir;
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        var foundPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var logEntries = new List<(string Path, DateTime? Timestamp)>();
 
-        void ScanDir(string dir)
-        {
-            if (string.IsNullOrWhiteSpace(dir) || !Directory.Exists(dir))
-                return;
-
-            try
-            {
-                foreach (var f in Directory.EnumerateFiles(dir, "*.log", SearchOption.AllDirectories))
-                {
-                    if (foundPaths.Add(f))
-                    {
-                        logEntries.Add((f, ParseTimestampFromFilename(f)));
-                    }
-                }
-            }
-            catch { /* best-effort */ }
-        }
-
-        ScanDir(_root);
-        var exeDir = AppContext.BaseDirectory;
-        if (!string.IsNullOrWhiteSpace(exeDir))
+        if (!string.IsNullOrWhiteSpace(_logsDir) && Directory.Exists(_logsDir))
         {
             try
             {
-                if (!string.Equals(Path.GetFullPath(exeDir), Path.GetFullPath(_root), StringComparison.OrdinalIgnoreCase))
+                foreach (var f in Directory.EnumerateFiles(_logsDir, "*.log", SearchOption.TopDirectoryOnly))
                 {
-                    ScanDir(exeDir);
+                    logEntries.Add((f, ParseTimestampFromFilename(f)));
                 }
             }
             catch { /* best-effort */ }

@@ -63,7 +63,7 @@ class Program
         if (options.ClearCache)
         {
             SkipCache.Clear();
-            Console.WriteLine("Cache cleared: ~/.quickmangatool/skipcache.dat");
+            Console.WriteLine($"Cache cleared: {AppPaths.GetSkipCacheFilePath()}");
             return 0;
         }
 
@@ -80,10 +80,10 @@ class Program
             return new VipsDiagnosticCommand().Execute(Array.Empty<string>(), new NoopRunLogger());
 
         if (options.ReadLogs)
-            return new ReadLogsCommand(options.Directory).Execute(Array.Empty<string>(), new NoopRunLogger());
+            return new ReadLogsCommand().Execute(Array.Empty<string>(), new NoopRunLogger());
 
         if (options.DeleteLogs)
-            return new DeleteLogsCommand(options.Directory, options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
+            return new DeleteLogsCommand(options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
 
         if (!Directory.Exists(options.Directory))
         {
@@ -163,31 +163,31 @@ class Program
     private static int ExecuteWithLogging(IAppCommand command, AppOptions options, IReadOnlyList<string> inputFiles)
     {
         var logFileName = $"QuickMangaTool_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log";
-        string logFilePath;
+        var logsDir = AppPaths.GetLogsDirectory();
+        var logFilePath = Path.Combine(logsDir, logFileName);
 
-        var exeDir = AppContext.BaseDirectory ?? AppDomain.CurrentDomain.BaseDirectory;
+        ColoredFileLogger logger;
         try
         {
-            var fullExeDir = Path.GetFullPath(exeDir);
-            if (!Directory.Exists(fullExeDir))
-                Directory.CreateDirectory(fullExeDir);
-
-            var tempTest = Path.Combine(fullExeDir, Path.GetRandomFileName());
-            using (var fs = File.Create(tempTest)) { }
-            File.Delete(tempTest);
-
-            logFilePath = Path.Combine(fullExeDir, logFileName);
+            logger = new ColoredFileLogger(logFilePath);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Warning: unable to create log in executable directory ({exeDir}): {ex.Message}. Falling back to {options.Directory}");
-            logFilePath = Path.Combine(options.Directory, logFileName);
+            var fallbackDir = Path.GetTempPath();
+            Console.Error.WriteLine($"Warning: unable to create log in {logsDir} ({ex.Message}). Falling back to {fallbackDir}");
+            logsDir = fallbackDir;
+            logFilePath = Path.Combine(logsDir, logFileName);
+            logger = new ColoredFileLogger(logFilePath);
         }
 
-        using var logger = new ColoredFileLogger(logFilePath);
-        logger.WriteHeader(DateTime.Now, options.DryRun, BuildFeatureLabel(options));
+        int result;
+        using (logger)
+        {
+            logger.WriteHeader(DateTime.Now, options.DryRun, BuildFeatureLabel(options));
+            result = command.Execute(inputFiles, logger);
+        }
 
-        int result = command.Execute(inputFiles, logger);
+        AppPaths.PruneOldLogs(50, logsDir);
         Console.WriteLine($"Log saved to: {logFilePath}");
         return result;
     }

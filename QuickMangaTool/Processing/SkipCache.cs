@@ -10,58 +10,32 @@ using System.IO;
 static class SkipCache
 {
     private static readonly object _lock = new object();
-    private static readonly string _cachePath;
+    private static string? _loadedPath;
     private static Dictionary<string, long>? _entries;
     private static bool _isDirty;
     private static int _pendingWrites;
 
-    static SkipCache()
-    {
-        string dir;
-        var custom = Environment.GetEnvironmentVariable("QUICKMANGATOOL_CACHE_DIR");
-        if (!string.IsNullOrWhiteSpace(custom))
-        {
-            dir = custom;
-        }
-        else
-        {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            dir = Path.Combine(string.IsNullOrWhiteSpace(home) ? Path.GetTempPath() : home, ".quickmangatool");
-        }
-
-        try
-        {
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-        }
-        catch
-        {
-            dir = Path.Combine(Path.GetTempPath(), ".quickmangatool");
-            try
-            {
-                if (!Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-            }
-            catch { /* best-effort */ }
-        }
-
-        _cachePath = Path.Combine(dir, "skipcache.dat");
-    }
+    private static string CachePath => AppPaths.GetSkipCacheFilePath();
 
     private static void EnsureLoaded()
     {
-        if (_entries != null)
+        var currentPath = CachePath;
+        if (_entries != null && string.Equals(_loadedPath, currentPath, StringComparison.Ordinal))
             return;
         lock (_lock)
         {
-            if (_entries != null)
+            currentPath = CachePath;
+            if (_entries != null && string.Equals(_loadedPath, currentPath, StringComparison.Ordinal))
                 return;
-            if (File.Exists(_cachePath))
+            _loadedPath = currentPath;
+            _isDirty = false;
+            _pendingWrites = 0;
+            if (File.Exists(currentPath))
             {
                 try
                 {
                     _entries = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-                    using var fs = File.OpenRead(_cachePath);
+                    using var fs = File.OpenRead(currentPath);
                     using var br = new BinaryReader(fs);
                     while (fs.Position < fs.Length)
                     {
@@ -89,7 +63,8 @@ static class SkipCache
         EnsureLoaded();
         lock (_lock)
         {
-            var tempPath = _cachePath + ".tmp";
+            var currentPath = CachePath;
+            var tempPath = currentPath + ".tmp";
             try
             {
                 using (var fs = File.Create(tempPath))
@@ -106,7 +81,7 @@ static class SkipCache
                     bw.Flush();
                 }
 
-                File.Move(tempPath, _cachePath, overwrite: true);
+                File.Move(tempPath, currentPath, overwrite: true);
                 _isDirty = false;
                 _pendingWrites = 0;
             }
@@ -202,8 +177,9 @@ static class SkipCache
                 _entries = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
                 _isDirty = false;
                 _pendingWrites = 0;
-                if (File.Exists(_cachePath))
-                    File.Delete(_cachePath);
+                var currentPath = CachePath;
+                if (File.Exists(currentPath))
+                    File.Delete(currentPath);
             }
             catch
             {

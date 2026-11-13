@@ -52,6 +52,12 @@ public static class VipsDiagnostics
         {
             Console.WriteLine($"Error while gathering VIPS diagnostics: {ex.Message}");
         }
+
+        Console.WriteLine("--------------------------------------------------------");
+        Console.WriteLine($"Config Directory     : {AppPaths.GetConfigDirectory()}");
+        Console.WriteLine($"Cache Directory      : {AppPaths.GetCacheDirectory()}");
+        Console.WriteLine($"Logs Directory       : {AppPaths.GetLogsDirectory()}");
+        Console.WriteLine($"Skip Cache File      : {AppPaths.GetSkipCacheFilePath()}");
         Console.WriteLine("========================================================");
     }
 }

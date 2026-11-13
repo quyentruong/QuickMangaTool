@@ -119,10 +119,10 @@ static class OptionsParser
         output.WriteLine("  cbr-to-cbz, --cbr-to-cbz          Convert .cbr archives to .cbz");
         output.WriteLine("  upscale, -u, --detect-upscale     Analyze .cbz image quality (dimensions, DPI, blur, noise)");
         output.WriteLine("  remove-old, --remove-old-cbz      Delete leftover .old.cbz backup files");
-        output.WriteLine("  read-logs, --read-logs            Interactively view run log files");
-        output.WriteLine("  delete-logs, --delete-logs        Delete all .log files in the target directory");
-        output.WriteLine("  diag, --vips-diagnostics          Print NetVips & libvips configuration and supported codecs");
-        output.WriteLine("  clear-cache, -c, --clear-cache    Clear the skip cache (~/.quickmangatool/skipcache.dat)");
+        output.WriteLine("  read-logs, --read-logs            Interactively view run log files from the logs directory");
+        output.WriteLine("  delete-logs, --delete-logs        Delete all .log files in the centralized logs directory");
+        output.WriteLine("  diag, --vips-diagnostics          Print NetVips configuration, codecs, and storage paths");
+        output.WriteLine("  clear-cache, -c, --clear-cache    Clear the skip cache file in the cache directory");
         output.WriteLine("  update, --update                  Check and update QuickMangaTool from GitHub Releases");
         output.WriteLine();
         output.WriteLine("Options:");

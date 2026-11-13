@@ -1,40 +1,7 @@
 public static class LastLocationStore
 {
     private static readonly object Lock = new();
-    private static readonly string StoragePath;
-
-    static LastLocationStore()
-    {
-        string dir;
-        var custom = Environment.GetEnvironmentVariable("QUICKMANGATOOL_CACHE_DIR");
-        if (!string.IsNullOrWhiteSpace(custom))
-        {
-            dir = custom;
-        }
-        else
-        {
-            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            dir = Path.Combine(string.IsNullOrWhiteSpace(home) ? Path.GetTempPath() : home, ".quickmangatool");
-        }
-
-        try
-        {
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-        }
-        catch
-        {
-            dir = Path.Combine(Path.GetTempPath(), ".quickmangatool");
-            try
-            {
-                if (!Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-            }
-            catch { /* best-effort */ }
-        }
-
-        StoragePath = Path.Combine(dir, "last_directory.txt");
-    }
+    private static string StoragePath => AppPaths.GetLastLocationFilePath();
 
     public static string? GetLastDirectory()
     {

@@ -1,17 +1,24 @@
 class DeleteLogsCommand : IAppCommand
 {
-    private readonly string _root;
+    private readonly string _logsDir;
     private readonly bool _confirm;
+
+    public DeleteLogsCommand(bool confirm = false)
+        : this(AppPaths.GetLogsDirectory(), confirm)
+    {
+    }
 
     public DeleteLogsCommand(string root, bool confirm = false)
     {
-        _root = root;
+        _logsDir = string.IsNullOrWhiteSpace(root) ? AppPaths.GetLogsDirectory() : root;
         _confirm = confirm;
     }
 
     public int Execute(IReadOnlyList<string> cbzFiles, IRunLogger logger)
     {
-        var logFiles = Directory.EnumerateFiles(_root, "*.log", SearchOption.AllDirectories).ToList();
+        var logFiles = Directory.Exists(_logsDir)
+            ? Directory.EnumerateFiles(_logsDir, "*.log", SearchOption.TopDirectoryOnly).ToList()
+            : new List<string>();
         if (logFiles.Count == 0)
         {
             Console.WriteLine("No .log files found.");
