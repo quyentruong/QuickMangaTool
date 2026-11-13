@@ -19,6 +19,8 @@ A C# .NET 10 command-line utility for bulk processing, optimizing, and analyzing
 
 ## Build on Linux
 
+Prerequisites for building Native AOT from source on Linux: `dotnet` (.NET 10 SDK), `clang`, and `zlib1g-dev` (e.g., `sudo apt install -y clang zlib1g-dev`).
+
 From the repository root:
 
 ```bash
@@ -28,8 +30,8 @@ dotnet restore QuickMangaTool.slnx
 # Build in Release mode
 dotnet build QuickMangaTool.slnx -c Release
 
-# Publish a self-contained Linux x64 binary
-dotnet publish QuickMangaTool/QuickMangaTool.csproj -c Release -r linux-x64 --self-contained true
+# Publish a standalone Native AOT Linux x64 binary
+dotnet publish QuickMangaTool/QuickMangaTool.csproj -c Release -r linux-x64
 ```
 
 Published output will be under:
@@ -121,8 +123,8 @@ QuickMangaTool update
 
 ## Requirements
 
-- .NET 10 runtime
 - Linux (x64) or Windows (x64)
+- Prebuilt release binaries are standalone Native AOT executables (no `.NET 10 runtime` required). Building from source requires the .NET 10 SDK (`clang` + `zlib1g-dev` on Linux; MSVC C++ build tools on Windows).
 - `libvips` installed on system (with WebP, AVIF/HEIF, JXL, JPEG, PNG, GIF, and TIFF support):
   - **Windows (WinGet)**:
     ```powershell

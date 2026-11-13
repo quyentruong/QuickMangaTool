@@ -9,20 +9,41 @@
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
 
-    <PublishAot>false</PublishAot>
+    <PublishAot>true</PublishAot>
     <OptimizationPreference>Size</OptimizationPreference>
+    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <IlcTrimMetadata>true</IlcTrimMetadata>
+    <StripSymbols>true</StripSymbols>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
-    
+
     <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>link</TrimMode>
-    
+    <TrimMode>full</TrimMode>
+
+    <DebuggerSupport>false</DebuggerSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <AutoreleasePoolSupport>false</AutoreleasePoolSupport>
     <StackTraceSupport>false</StackTraceSupport>
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <EventSourceSupport>false</EventSourceSupport>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <_ExtraTrimmerArgs>$(_ExtraTrimmerArgs) --substitutions "$(MSBuildThisFileDirectory)ILLink.Substitutions.xml"</_ExtraTrimmerArgs>
   </PropertyGroup>
+
+  <ItemGroup>
+    <IlcArg Include="--substitution:$(MSBuildThisFileDirectory)ILLink.Substitutions.xml" />
+  </ItemGroup>
+
+  <Target Name="_UpgradeBundledNativeAotPacks"
+          BeforeTargets="ProcessFrameworkReferences"
+          Condition="'$(BundledNETCoreAppPackageVersion)' != '' and $([MSBuild]::VersionLessThan('$(BundledNETCoreAppPackageVersion)', '10.0.14'))">
+    <ItemGroup>
+      <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="10.0.14" />
+      <KnownRuntimePack Update="Microsoft.NETCore.App" LatestRuntimeFrameworkVersion="10.0.14" Condition="'%(KnownRuntimePack.RuntimePackLabels)' == 'NativeAOT'" />
+      <KnownILLinkPack Update="Microsoft.NET.ILLink.Tasks" ILLinkPackVersion="10.0.14" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="NetVips" Version="3.2.0" />

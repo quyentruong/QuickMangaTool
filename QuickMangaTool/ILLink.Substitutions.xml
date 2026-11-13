@@ -1,0 +1,121 @@
+<linker>
+  <assembly fullname="UglyToad.PdfPig">
+    <resource name="UglyToad.PdfPig.Resources.CMap.83pv-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90msp-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90msp-RKSJ-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90ms-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90ms-RKSJ-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90pv-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.90pv-RKSJ-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Add-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Add-RKSJ-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-0" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-1" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-3" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-4" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-5" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-6" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-CNS1-UCS2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-0" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-1" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-3" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-4" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-5" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-GB1-UCS2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-0" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-1" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-3" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-4" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-5" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-6" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-7" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan1-UCS2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Japan2-0" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Korea1-0" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Korea1-1" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Korea1-2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Adobe-Korea1-UCS2" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.B5pc-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.B5pc-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.CNS-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.CNS-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.ETen-B5-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.ETen-B5-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.ETenms-B5-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.ETenms-B5-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Ext-RKSJ-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Ext-RKSJ-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GB-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GB-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBK2K-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBK2K-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBK-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBK-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBKp-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBKp-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBpc-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.GBpc-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.HKscs-B5-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.HKscs-B5-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Identity-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.Identity-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSC-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSC-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCms-UHC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCms-UHC-HW-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCms-UHC-HW-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCms-UHC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCpc-EUC-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.KSCpc-EUC-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniCNS-UCS2-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniCNS-UCS2-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniCNS-UTF16-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniCNS-UTF16-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniGB-UCS2-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniGB-UCS2-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniGB-UTF16-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniGB-UTF16-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UCS2-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UCS2-HW-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UCS2-HW-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UCS2-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UTF16-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniJIS-UTF16-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniKS-UCS2-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniKS-UCS2-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniKS-UTF16-H" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.UniKS-UTF16-V" action="remove" />
+    <resource name="UglyToad.PdfPig.Resources.CMap.V" action="remove" />
+  </assembly>
+  <assembly fullname="UglyToad.PdfPig.Fonts">
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-Bold.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-BoldOblique.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-Oblique.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-Bold.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-BoldOblique.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-Oblique.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.MustRead.html" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Symbol.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Bold.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-BoldItalic.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Italic.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Roman.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.ZapfDingbats.afm" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.additional" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.glyphlist" action="remove" />
+    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.zapfdingbats" action="remove" />
+  </assembly>
+  <assembly fullname="SharpCompress">
+    <type fullname="SharpCompress.Factories.Factory">
+      <method signature="System.Void .cctor()" body="stub" />
+    </type>
+  </assembly>
+</linker>

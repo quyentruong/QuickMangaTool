@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using Spectre.Console;
-using SharpCompress.Readers;
+using SharpCompress.Readers.Rar;
 
 internal interface ICbrArchiveReader
 {
@@ -52,7 +52,7 @@ internal sealed class SharpCompressCbrArchiveReader : ICbrArchiveReader
     public IReadOnlyList<CbrArchiveEntry> ReadEntries(string sourcePath)
     {
         using var sourceStream = File.OpenRead(sourcePath);
-        using var reader = ReaderFactory.OpenReader(sourceStream);
+        using var reader = RarReader.OpenReader(sourceStream);
            
         var entries = new List<CbrArchiveEntry>();
 
