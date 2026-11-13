@@ -1,5 +1,14 @@
 static class OptionsParser
 {
+    private static readonly HashSet<string> KnownSubcommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "convert", "compress", "pdf-to-cbz", "cbr-to-cbz", "upscale", "remove-old",
+        "read-logs", "delete-logs", "diag", "clear-cache", "update"
+    };
+
+    public static bool IsKnownSubcommand(string? arg)
+        => !string.IsNullOrWhiteSpace(arg) && KnownSubcommands.Contains(arg);
+
     /// <summary>
     /// Parses <paramref name="args"/> into <see cref="AppOptions"/>.
     /// Returns <see langword="null"/> when help was printed and the caller should exit with 0.
@@ -28,6 +37,7 @@ static class OptionsParser
         var deleteLogs = args.Contains("--delete-logs") || args.Contains("delete-logs");
         var vipsDiagnostics = args.Contains("--vips-diagnostics") || args.Contains("diag");
         var clearCache = args.Contains("--clear-cache") || args.Contains("-c") || args.Contains("clear-cache");
+        var updateApp = args.Contains("--update") || args.Contains("update");
         var deleteSource = args.Contains("--delete-source");
 
         int parallelism = 0;
@@ -48,14 +58,7 @@ static class OptionsParser
                 effort = ev;
         }
 
-        // Known subcommands that are not directory paths
-        var knownSubcommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "convert", "compress", "pdf-to-cbz", "cbr-to-cbz", "upscale", "remove-old",
-            "read-logs", "delete-logs", "diag", "clear-cache"
-        };
-
-        var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-') && !knownSubcommands.Contains(a));
+        var directoryArg = args.FirstOrDefault(a => !a.StartsWith('-') && !KnownSubcommands.Contains(a));
 
         var imageFormat = ImageFormat.Webp;
         var fArg = args.FirstOrDefault(a => a.StartsWith("--image-format="));
@@ -73,7 +76,7 @@ static class OptionsParser
 
         bool hasAction = convertImages || compressFolders || pdfToCbz || cbrToCbz ||
                          detectUpscale || removeOldCbz || readLogs || deleteLogs ||
-                         vipsDiagnostics || clearCache || interactive;
+                         vipsDiagnostics || clearCache || updateApp || interactive;
 
         if (!hasAction)
         {
@@ -101,7 +104,8 @@ static class OptionsParser
             CbrToCbz: cbrToCbz,
             Parallelism: parallelism,
             Effort: effort,
-            ClearCache: clearCache);
+            ClearCache: clearCache,
+            UpdateApp: updateApp);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -119,6 +123,7 @@ static class OptionsParser
         output.WriteLine("  delete-logs, --delete-logs        Delete all .log files in the target directory");
         output.WriteLine("  diag, --vips-diagnostics          Print NetVips & libvips configuration and supported codecs");
         output.WriteLine("  clear-cache, -c, --clear-cache    Clear the skip cache (~/.quickmangatool/skipcache.dat)");
+        output.WriteLine("  update, --update                  Check and update QuickMangaTool from GitHub Releases");
         output.WriteLine();
         output.WriteLine("Options:");
         output.WriteLine("  -i, --interactive                 Open interactive menu (default when run without arguments in terminal)");

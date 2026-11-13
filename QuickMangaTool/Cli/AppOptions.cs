@@ -23,7 +23,8 @@ record AppOptions(
     bool CbrToCbz,
     int Parallelism,
     int? Effort,
-    bool ClearCache)
+    bool ClearCache,
+    bool UpdateApp = false)
 {
     public bool ConvertToWebp => ConvertImages;
 }

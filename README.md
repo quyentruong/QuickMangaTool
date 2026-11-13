@@ -64,6 +64,7 @@ If `path` is omitted, the current working directory is used.
 | `delete-logs` | `--delete-logs` | Delete all `.log` files in the target directory |
 | `diag` | `--vips-diagnostics` | Print NetVips & system libvips codec configuration |
 | `clear-cache` | `-c`, `--clear-cache` | Clear the persistent skip cache |
+| `update` | `--update` | Check and update QuickMangaTool from GitHub Releases |
 
 ### Options
 
@@ -113,6 +114,9 @@ QuickMangaTool /path/to/manga remove-old -y
 
 # Verify libvips system installation and codec support (WebP, HEIF/AVIF, JXL)
 QuickMangaTool --vips-diagnostics
+
+# Check for and apply updates from GitHub Releases
+QuickMangaTool update
 ```
 
 ## Requirements

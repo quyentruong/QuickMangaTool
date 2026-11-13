@@ -259,6 +259,26 @@ public class OptionsParserTests
         Assert.True(options.ClearCache);
     }
 
+    [Fact]
+    public void UpdateSubcommand_SetsUpdateApp()
+    {
+        var options = Parse("update");
+
+        Assert.NotNull(options);
+        Assert.True(options.UpdateApp);
+        Assert.True(OptionsParser.IsKnownSubcommand("update"));
+    }
+
+    [Fact]
+    public void UpdateFlag_SetsUpdateApp()
+    {
+        var options = Parse("--update", "-y");
+
+        Assert.NotNull(options);
+        Assert.True(options.UpdateApp);
+        Assert.True(options.Confirm);
+    }
+
     // ── ImageFormat & Effort ──────────────────────────────────────────────
 
     [Fact]

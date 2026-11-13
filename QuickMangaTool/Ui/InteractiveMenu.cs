@@ -17,7 +17,7 @@ static class InteractiveMenu
                 : currentDir);
 
             AnsiConsole.Clear();
-            AnsiConsole.Write(new Rule("[bold cyan]QuickMangaTool[/]").LeftJustified());
+            AnsiConsole.Write(new Rule($"[bold cyan]QuickMangaTool v{Markup.Escape(AppVersionHelper.GetCurrentVersionString())}[/]").LeftJustified());
             AnsiConsole.WriteLine();
 
             var summary = FolderNavigationHelper.GetDirectorySummary(currentDir);
@@ -42,6 +42,7 @@ static class InteractiveMenu
                         "9. 🗑️ Xóa nhật ký chạy (Delete Logs)",
                         "10. ⚙️ Kiểm tra cấu hình libvips (VIPS Diagnostics)",
                         "11. 🧼 Xóa bộ nhớ đệm (Clear Skip Cache)",
+                        "12. 🚀 Kiểm tra & Cập nhật ứng dụng (Update App)",
                         "0. 🚪 Thoát (Exit)"
                     }));
 
@@ -67,6 +68,11 @@ static class InteractiveMenu
             if (action.StartsWith("11."))
             {
                 return CreateDefaultOptions(currentDir) with { ClearCache = true };
+            }
+
+            if (action.StartsWith("12."))
+            {
+                return CreateDefaultOptions(currentDir) with { UpdateApp = true };
             }
 
             if (action.StartsWith("8."))

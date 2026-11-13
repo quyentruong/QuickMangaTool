@@ -4,8 +4,11 @@ class Program
 {
     static int Main(string[] args)
     {
+        AppVersionHelper.CleanupOldExecutableIfPresent();
+
         bool isInteractive = args.Contains("--interactive") || args.Contains("-i") ||
-            (!Console.IsInputRedirected && (args.Length == 0 || (args.Length == 1 && !args[0].StartsWith('-'))));
+            (!Console.IsInputRedirected && (args.Length == 0 ||
+                (args.Length == 1 && !args[0].StartsWith('-') && !OptionsParser.IsKnownSubcommand(args[0]))));
 
         if (isInteractive)
         {
@@ -70,6 +73,9 @@ class Program
         }
 
         // Standalone commands that do not produce batch log files and don't strictly require target directory to exist
+        if (options.UpdateApp)
+            return new UpdateCommand(options.Confirm).Execute(Array.Empty<string>(), new NoopRunLogger());
+
         if (options.VipsDiagnostics)
             return new VipsDiagnosticCommand().Execute(Array.Empty<string>(), new NoopRunLogger());
 
