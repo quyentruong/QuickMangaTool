@@ -1,19 +1,24 @@
 namespace QuickMangaTool.Tests.Utilities;
 
+[Collection("AppPathsEnv")]
 public class LastLocationStoreTests : IDisposable
 {
     private readonly string _testDir;
+    private readonly string? _originalConfigDir;
 
     public LastLocationStoreTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), "QuickMangaTool_LastLocTests_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_testDir);
+        _originalConfigDir = Environment.GetEnvironmentVariable(AppPaths.ConfigDirEnvVar);
+        Environment.SetEnvironmentVariable(AppPaths.ConfigDirEnvVar, _testDir);
         LastLocationStore.ClearLastDirectory();
     }
 
     public void Dispose()
     {
         LastLocationStore.ClearLastDirectory();
+        Environment.SetEnvironmentVariable(AppPaths.ConfigDirEnvVar, _originalConfigDir);
         try
         {
             if (Directory.Exists(_testDir))

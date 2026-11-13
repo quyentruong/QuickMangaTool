@@ -1,5 +1,9 @@
 namespace QuickMangaTool.Tests.Utilities;
 
+[CollectionDefinition("AppPathsEnv", DisableParallelization = true)]
+public class AppPathsEnvCollectionDefinition { }
+
+[Collection("AppPathsEnv")]
 public class AppPathsTests : IDisposable
 {
     private readonly string _tempRoot;
