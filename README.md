@@ -123,4 +123,30 @@ QuickMangaTool update
 
 - .NET 10 runtime
 - Linux (x64) or Windows (x64)
-- `libvips` installed on system (with WebP, AVIF/HEIF, and JXL plugins enabled)
+- `libvips` installed on system (with WebP, AVIF/HEIF, JXL, JPEG, PNG, GIF, and TIFF support):
+  - **Windows (WinGet)**:
+    ```powershell
+    winget install -e --id libvips.libvips
+    ```
+    *(Restart your terminal after installation so `PATH` is refreshed.)*
+  - **Linux**:
+    - **Ubuntu / Debian**:
+      ```bash
+      sudo apt update && sudo apt install -y libvips libheif-plugin-aomenc libheif-plugin-dav1d
+      ```
+    - **Arch / Manjaro**:
+      ```bash
+      sudo pacman -S --needed libvips libwebp libheif libjxl aom dav1d libjpeg-turbo libpng libtiff cgif
+      ```
+    - **Fedora / RHEL**:
+      ```bash
+      sudo dnf install -y vips libheif-freeworld
+      ```
+    - **openSUSE**:
+      ```bash
+      sudo zypper install -y libvips42 libheif-aom libheif-dav1d
+      ```
+    - **Alpine Linux**:
+      ```bash
+      sudo apk add vips vips-heif vips-jxl
+      ```
