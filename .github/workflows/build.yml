@@ -58,7 +58,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libvips libvips-dev libvips-tools
+        sudo apt-get install -y libvips libvips-dev libvips-tools libheif-plugin-aomenc libheif-plugin-dav1d
 
     - name: Restore dependencies
       run: dotnet restore QuickMangaTool.slnx
