@@ -258,4 +258,116 @@ public class UpscaleDetectorTests
 
         Assert.False(result.NeedsUpscale);
     }
+
+    // ── Stratified / replacement sampling & outlier tolerance ─────────────
+
+    [Fact]
+    public void Scan_SkippedAdOrSparsePages_PullsReplacementCandidates()
+    {
+        var entries = Enumerable.Range(1, 14).Select(i => $"page{i:D3}.jpg").ToList();
+        var cbzPath = CreateTempCbz(entries);
+        try
+        {
+            int callIndex = 0;
+            var analyzer = new Mock<IImageQualityAnalyzer>();
+            analyzer.Setup(a => a.Analyze(It.IsAny<Stream>())).Returns(() =>
+            {
+                callIndex++;
+                // First 4 candidates are skipped (2 ad banners, 2 sparse pages),
+                // followed by 2 blurry pages that should still be detected.
+                return callIndex switch
+                {
+                    1 or 2 => AdBannerMetrics(),
+                    3 or 4 => SparsePageMetrics(),
+                    5 or 6 => BlurryMetrics(),
+                    _ => GoodMetrics()
+                };
+            });
+
+            var detector = new UpscaleDetector(analyzer.Object);
+            var result = detector.Scan(cbzPath);
+
+            Assert.True(result.NeedsUpscale);
+            Assert.Equal(2, result.Issues.Count);
+            analyzer.Verify(a => a.Analyze(It.IsAny<Stream>()), Times.Exactly(14));
+        }
+        finally { File.Delete(cbzPath); }
+    }
+
+    [Fact]
+    public void Scan_OutlierTolerance_SingleBadPageOutOfSixValidPages_ReturnsClean()
+    {
+        var entries = Enumerable.Range(1, 6).Select(i => $"page{i:D3}.jpg").ToList();
+        var cbzPath = CreateTempCbz(entries);
+        try
+        {
+            int callIndex = 0;
+            var analyzer = new Mock<IImageQualityAnalyzer>();
+            analyzer.Setup(a => a.Analyze(It.IsAny<Stream>())).Returns(() =>
+            {
+                callIndex++;
+                return callIndex == 1 ? BlurryMetrics() : GoodMetrics();
+            });
+
+            var detector = new UpscaleDetector(analyzer.Object);
+            var result = detector.Scan(cbzPath);
+
+            Assert.False(result.NeedsUpscale);
+            Assert.Empty(result.Issues);
+        }
+        finally { File.Delete(cbzPath); }
+    }
+
+    [Fact]
+    public void Scan_OutlierTolerance_TwoBadPagesOutOfSixValidPages_ReportsNeedsUpscale()
+    {
+        var entries = Enumerable.Range(1, 6).Select(i => $"page{i:D3}.jpg").ToList();
+        var cbzPath = CreateTempCbz(entries);
+        try
+        {
+            int callIndex = 0;
+            var analyzer = new Mock<IImageQualityAnalyzer>();
+            analyzer.Setup(a => a.Analyze(It.IsAny<Stream>())).Returns(() =>
+            {
+                callIndex++;
+                return callIndex <= 2 ? BlurryMetrics() : GoodMetrics();
+            });
+
+            var detector = new UpscaleDetector(analyzer.Object);
+            var result = detector.Scan(cbzPath);
+
+            Assert.True(result.NeedsUpscale);
+            Assert.Equal(2, result.Issues.Count);
+        }
+        finally { File.Delete(cbzPath); }
+    }
+
+    [Fact]
+    public void Scan_SoftUpscaledEdges_ReportsNeedsUpscale()
+    {
+        var softUpscaledMetrics = new ImageQualityMetrics(
+            Width: 1200,
+            Height: 1800,
+            DpiX: 0,
+            DpiY: 0,
+            BlurScore: 120.0,
+            NoiseScore: 3.0,
+            EdgeDensity: 0.25,
+            SharpEdgeRatio: 0.05);
+
+        var cbzPath = CreateTempCbz(["page001.jpg"]);
+        try
+        {
+            var analyzer = new Mock<IImageQualityAnalyzer>();
+            analyzer.Setup(a => a.Analyze(It.IsAny<Stream>())).Returns(softUpscaledMetrics);
+
+            var detector = new UpscaleDetector(analyzer.Object);
+            var result = detector.Scan(cbzPath);
+
+            Assert.True(result.NeedsUpscale);
+            Assert.Single(result.Issues);
+            Assert.Contains("soft/upscaled edges", result.Issues[0].Reasons[0]);
+        }
+        finally { File.Delete(cbzPath); }
+    }
 }

@@ -12,6 +12,8 @@ static class SkipCache
     private static readonly object _lock = new object();
     private static readonly string _cachePath;
     private static Dictionary<string, long>? _entries;
+    private static bool _isDirty;
+    private static int _pendingWrites;
 
     static SkipCache()
     {
@@ -87,23 +89,35 @@ static class SkipCache
         EnsureLoaded();
         lock (_lock)
         {
+            var tempPath = _cachePath + ".tmp";
             try
             {
-                using var fs = File.Create(_cachePath);
-                using var bw = new BinaryWriter(fs);
-                var entries = _entries!;
-                foreach (var kv in entries)
+                using (var fs = File.Create(tempPath))
+                using (var bw = new BinaryWriter(fs))
                 {
-                    var pathBytes = System.Text.Encoding.UTF8.GetBytes(kv.Key);
-                    bw.Write(pathBytes.Length);
-                    bw.Write(pathBytes);
-                    bw.Write(kv.Value);
+                    var entries = _entries!;
+                    foreach (var kv in entries)
+                    {
+                        var pathBytes = System.Text.Encoding.UTF8.GetBytes(kv.Key);
+                        bw.Write(pathBytes.Length);
+                        bw.Write(pathBytes);
+                        bw.Write(kv.Value);
+                    }
+                    bw.Flush();
                 }
-                bw.Flush();
+
+                File.Move(tempPath, _cachePath, overwrite: true);
+                _isDirty = false;
+                _pendingWrites = 0;
             }
             catch
             {
-                // best-effort: ignore failures to persist cache
+                try
+                {
+                    if (File.Exists(tempPath))
+                        File.Delete(tempPath);
+                }
+                catch { /* ignore */ }
             }
         }
     }
@@ -121,7 +135,7 @@ static class SkipCache
                 if (!File.Exists(fullPath))
                 {
                     _entries.Remove(fullPath);
-                    Save();
+                    _isDirty = true;
                     return false;
                 }
 
@@ -130,7 +144,7 @@ static class SkipCache
                     return true;
 
                 _entries.Remove(fullPath);
-                Save();
+                _isDirty = true;
                 return false;
             }
         }
@@ -140,7 +154,7 @@ static class SkipCache
         }
     }
 
-    public static void MarkNoChange(string fullPath)
+    public static void MarkNoChange(string fullPath, bool flushImmediately = true)
     {
         try
         {
@@ -151,12 +165,28 @@ static class SkipCache
                     return;
                 var ticks = File.GetLastWriteTimeUtc(fullPath).Ticks;
                 _entries![fullPath] = ticks;
-                Save();
+                _isDirty = true;
+                _pendingWrites++;
+
+                if (flushImmediately || _pendingWrites >= 100)
+                    Save();
             }
         }
         catch
         {
             // ignore
+        }
+    }
+
+    /// <summary>
+    /// Persists pending cache changes to disk if modified.
+    /// </summary>
+    public static void Flush()
+    {
+        lock (_lock)
+        {
+            if (_isDirty)
+                Save();
         }
     }
 
@@ -170,6 +200,8 @@ static class SkipCache
             try
             {
                 _entries = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+                _isDirty = false;
+                _pendingWrites = 0;
                 if (File.Exists(_cachePath))
                     File.Delete(_cachePath);
             }

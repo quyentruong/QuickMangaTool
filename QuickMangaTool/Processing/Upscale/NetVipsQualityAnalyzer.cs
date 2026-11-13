@@ -11,12 +11,34 @@ class NetVipsQualityAnalyzer : IImageQualityAnalyzer
     // on large manga pages without sacrificing detection accuracy.
     private const int SampleStride = 4;
 
+    // A Laplacian response above this magnitude is treated as a genuine edge.
+    // Value of 8 is well above typical flat-region noise (~1–3) but below
+    // the response of even soft edges on a manga page (~20–200).
+    private const int SignificantLapThreshold = 8;
+
+    // Edges exceeding this magnitude represent crisp, un-interpolated line art.
+    private const int StrongLapThreshold = 32;
+
+    // Reference edge density for normalizing Laplacian variance so sparse pages
+    // are not penalized by whitespace and dense pages do not mask blur.
+    private const double ReferenceEdgeDensity = 0.15;
+
+    private readonly int _minWidthForPixelAnalysis;
+
+    public NetVipsQualityAnalyzer(int minWidthForPixelAnalysis = 3)
+    {
+        _minWidthForPixelAnalysis = Math.Max(3, minWidthForPixelAnalysis);
+    }
+
     /// <inheritdoc/>
     public ImageQualityMetrics? Analyze(Stream stream)
     {
         try
         {
             var sourceData = StreamByteReader.Read(stream, out _);
+            if (sourceData.Length == 0)
+                return null;
+
             using var image = Image.NewFromBuffer(sourceData, kwargs: new VOption
             {
                 {"access", Enums.Access.Sequential}
@@ -28,12 +50,30 @@ class NetVipsQualityAnalyzer : IImageQualityAnalyzer
             double dpiX = ToDpi(image.Xres);
             double dpiY = ToDpi(image.Yres);
 
-            using var grayscale = image.Colourspace(Enums.Interpretation.Bw).Cast(Enums.BandFormat.Uchar);
-            var pixels = grayscale.WriteToMemory<byte>();
+            if (width < _minWidthForPixelAnalysis || width < 3 || height < 3)
+                return new ImageQualityMetrics(width, height, dpiX, dpiY, 0, 0, 0, 0);
 
-            (double blurScore, double noiseScore, double edgeDensity) = ComputePixelScores(pixels, width, height);
+            using var bwImage = image.Bands == 1 && image.Interpretation == Enums.Interpretation.Bw
+                ? null
+                : image.Colourspace(Enums.Interpretation.Bw);
+            var current = bwImage ?? image;
 
-            return new ImageQualityMetrics(width, height, dpiX, dpiY, blurScore, noiseScore, edgeDensity);
+            using var singleBand = current.Bands > 1
+                ? current.ExtractBand(0)
+                : null;
+            current = singleBand ?? current;
+
+            using var ucharImage = current.Format != Enums.BandFormat.Uchar
+                ? current.Cast(Enums.BandFormat.Uchar)
+                : null;
+            current = ucharImage ?? current;
+
+            var pixels = current.WriteToMemory<byte>();
+
+            (double blurScore, double noiseScore, double edgeDensity, double sharpEdgeRatio) =
+                ComputePixelScores(pixels, width, height);
+
+            return new ImageQualityMetrics(width, height, dpiX, dpiY, blurScore, noiseScore, edgeDensity, sharpEdgeRatio);
         }
         catch
         {
@@ -50,87 +90,81 @@ class NetVipsQualityAnalyzer : IImageQualityAnalyzer
         pixelsPerMillimeter > 0 ? pixelsPerMillimeter * 25.4 : 0;
 
     /// <summary>
-    /// Computes blur, noise, and edge-density scores by sampling pixel values via the 4-neighbor Laplacian.
-    /// <list type="bullet">
-    ///   <item><description>
-    ///     <b>Blur score</b>: variance of the Laplacian — high variance means sharp edges exist;
-    ///     low variance indicates the image is blurry.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Noise score</b>: Immerkaer-style noise sigma from 1-D second-order finite differences —
-    ///     high sigma indicates uniform high-frequency noise or compression artifacts.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Edge density</b>: fraction of sampled pixels whose |Laplacian| exceeds
-    ///     <see cref="SignificantLapThreshold"/> — low values identify sparse pages
-    ///     (chapter dividers, title cards) that should be excluded from blur detection.
-    ///   </description></item>
-    /// </list>
+    /// Computes blur, noise, edge-density, and sharp-edge-ratio scores by sampling pixel values
+    /// via the 4-neighbor Laplacian and 2-D Immerkaer operator.
     /// </summary>
-    private static (double blurScore, double noiseScore, double edgeDensity) ComputePixelScores(byte[] pixels, int width, int height)
+    private static (double blurScore, double noiseScore, double edgeDensity, double sharpEdgeRatio) ComputePixelScores(
+        byte[] pixels, int width, int height)
     {
-        if (width < 3 || height < 3)
-            return (0, 0, 0);
+        if (width < 3 || height < 3 || pixels.Length < width * height)
+            return (0, 0, 0, 0);
 
-        double lapSum = 0;
-        double lapSumSq = 0;
-        double noiseSum = 0;
+        long lapSum = 0;
+        long lapSumSq = 0;
+        long noiseSum = 0;
         int lapCount = 0;
         int noiseCount = 0;
         int significantEdgeCount = 0;
-
-        // A Laplacian response above this magnitude is treated as a genuine edge.
-        // Value of 8 is well above typical flat-region noise (~1–3) but below
-        // the response of even soft edges on a manga page (~20–200).
-        const double SignificantLapThreshold = 8.0;
+        int strongEdgeCount = 0;
 
         for (int y = SampleStride; y < height - SampleStride; y += SampleStride)
         {
-            var rowOffset = y * width;
-            var prevRowOffset = (y - 1) * width;
-            var nextRowOffset = (y + 1) * width;
+            ReadOnlySpan<byte> prevRow = pixels.AsSpan((y - 1) * width, width);
+            ReadOnlySpan<byte> currRow = pixels.AsSpan(y * width, width);
+            ReadOnlySpan<byte> nextRow = pixels.AsSpan((y + 1) * width, width);
 
             for (int x = SampleStride; x < width - SampleStride; x += SampleStride)
             {
-                byte center = pixels[rowOffset + x];
+                int center = currRow[x];
 
                 // 4-neighbor Laplacian: L = Σ(neighbors) − 4·center
-                double lap = pixels[prevRowOffset + x]
-                           + pixels[nextRowOffset + x]
-                           + pixels[rowOffset + x - 1]
-                           + pixels[rowOffset + x + 1]
-                           - 4.0 * center;
+                int lap = prevRow[x] + nextRow[x] + currRow[x - 1] + currRow[x + 1] - (4 * center);
+                int absLap = Math.Abs(lap);
+
                 lapSum += lap;
-                lapSumSq += lap * lap;
+                lapSumSq += (long)lap * lap;
                 lapCount++;
 
-                if (Math.Abs(lap) > SignificantLapThreshold)
+                if (absLap > SignificantLapThreshold)
+                {
                     significantEdgeCount++;
+                    if (absLap > StrongLapThreshold)
+                        strongEdgeCount++;
+                }
 
-                // 1-D second-order finite difference: |I(x-1) - 2·I(x) + I(x+1)|
-                // Approximates the contribution of noise at this sample point.
-                double diff = Math.Abs(
-                    pixels[rowOffset + x - 1] - 2.0 * center + pixels[rowOffset + x + 1]);
-                noiseSum += diff;
-                noiseCount++;
+                // 2-D Immerkaer (3x3) noise operator evaluated outside strong edges
+                // so manga line art (vertical/horizontal lines) is not mistaken for noise.
+                if (absLap <= StrongLapThreshold)
+                {
+                    int immerkaer =
+                        (prevRow[x - 1] - (2 * prevRow[x]) + prevRow[x + 1])
+                      - (2 * (currRow[x - 1] - (2 * center) + currRow[x + 1]))
+                      + (nextRow[x - 1] - (2 * nextRow[x]) + nextRow[x + 1]);
+                    noiseSum += Math.Abs(immerkaer);
+                    noiseCount++;
+                }
             }
         }
 
         if (lapCount == 0)
-            return (0, 0, 0);
+            return (0, 0, 0, 0);
 
-        double mean = lapSum / lapCount;
-        double blurScore = (lapSumSq / lapCount) - (mean * mean); // variance of Laplacian
+        double edgeDensity = (double)significantEdgeCount / lapCount;
+        double sharpEdgeRatio = significantEdgeCount > 0
+            ? (double)strongEdgeCount / significantEdgeCount
+            : 0;
 
-        // Immerkaer (1996) noise sigma estimate using 1-D finite differences.
-        // sqrt(π/2) / (6·n) · Σ|Δ²| approximates the standard deviation of additive Gaussian noise.
+        double mean = (double)lapSum / lapCount;
+        double rawVariance = ((double)lapSumSq / lapCount) - (mean * mean);
+        double blurScore = significantEdgeCount > 0
+            ? rawVariance * (ReferenceEdgeDensity / edgeDensity)
+            : rawVariance;
+
+        // Immerkaer (1996) noise sigma estimate using 3x3 second-order finite differences.
         double noiseScore = noiseCount > 0
             ? Math.Sqrt(Math.PI / 2.0) * noiseSum / (6.0 * noiseCount)
             : 0;
 
-        // Fraction of sampled pixels that responded as genuine edges.
-        double edgeDensity = (double)significantEdgeCount / lapCount;
-
-        return (blurScore, noiseScore, edgeDensity);
+        return (blurScore, noiseScore, edgeDensity, sharpEdgeRatio);
     }
 }

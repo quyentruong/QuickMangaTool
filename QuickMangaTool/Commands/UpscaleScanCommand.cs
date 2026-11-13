@@ -80,12 +80,13 @@ class UpscaleScanCommand : IAppCommand
                 logger.WriteEntry(pr);
                 // If the scan determined there was no upscale needed, remember it so we can skip next time
                 if (r.Error is null && !needsUpscale)
-                    SkipCache.MarkNoChange(r.Path);
+                    SkipCache.MarkNoChange(r.Path, flushImmediately: false);
                 task.Increment(1);
             }
         });
 
         producer.Wait();
+        SkipCache.Flush();
         logger.WriteSummary(cbzFiles.Count, 0, needs);
         Console.WriteLine($"Found {needs} archives that likely need upscaling.");
         return 0;

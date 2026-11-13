@@ -137,7 +137,9 @@ class Program
 
         if (options.DetectUpscale)
         {
-            var command = new UpscaleScanCommand(new UpscaleDetector(new NetVipsQualityAnalyzer()), options.Parallelism);
+            var command = new UpscaleScanCommand(
+                new UpscaleDetector(new NetVipsQualityAnalyzer(UpscaleDetector.MinAdWidth)),
+                options.Parallelism);
             return ExecuteWithLogging(command, options, cbzFiles);
         }
 

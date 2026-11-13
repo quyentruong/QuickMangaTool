@@ -16,9 +16,19 @@ static class StreamByteReader
             return memoryStream.ToArray();
         }
 
-        using var sourceBuffer = new MemoryStream();
+        int capacity = input.CanSeek && input.Length is > 0 and <= int.MaxValue ? (int)input.Length : 65536;
+        using var sourceBuffer = new MemoryStream(capacity);
         input.CopyTo(sourceBuffer);
         sourceBytes = sourceBuffer.Length;
+
+        if (sourceBuffer.TryGetBuffer(out var outBuffer) &&
+            outBuffer.Array is not null &&
+            outBuffer.Offset == 0 &&
+            outBuffer.Count == outBuffer.Array.Length)
+        {
+            return outBuffer.Array;
+        }
+
         return sourceBuffer.ToArray();
     }
 }

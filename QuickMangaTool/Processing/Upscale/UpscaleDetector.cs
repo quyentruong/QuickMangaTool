@@ -39,13 +39,22 @@ class UpscaleDetector : IUpscaleDetector
 
     // Images narrower than this are assumed to be advertisement banners and are excluded
     // from quality checks so they cannot trigger a false upscale detection.
-    private const int MinAdWidth = 300;
+    internal const int MinAdWidth = 300;
 
     // Pages whose edge density falls below this fraction are sparse interstitial pages
     // (chapter dividers, title cards, "Later Part" separators) where the Laplacian variance
     // is naturally low due to absent content rather than actual blur. Skipping them prevents
     // false upscale detections without requiring any pixel-level content classification.
     private const double MinEdgeDensity = 0.05;
+
+    // Minimum fraction of detected edges that must be strong/crisp.
+    // Fake-upscaled images (e.g. bilinear/bicubic) exhibit smooth ramps across edges,
+    // causing sharp edge ratio to drop below this threshold.
+    private const double MinSharpEdgeRatio = 0.18;
+
+    private const int MaxSamplesToAnalyze = 10;
+    private const int MultiSampleMinValidPages = 5;
+    private const int MultiSampleMinFailingPages = 2;
 
     private readonly IImageQualityAnalyzer _analyzer;
 
@@ -62,26 +71,22 @@ class UpscaleDetector : IUpscaleDetector
         {
             using var zip = ZipFile.OpenRead(cbzPath);
 
-            // Collect image entries upfront to apply the index-based skip rule.
             var imageEntries = zip.Entries
                 .Where(e => !string.IsNullOrEmpty(e.Name))
                 .Where(e => ImageExtensions.IsSupportedForAnalysis(e.Name))
+                .OrderBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            // Check the 5 smallest and 5 largest image files by uncompressed size to
-            // reduce work while sampling both ends of the distribution. Ensure the
-            // combined list is unique (small archives may have fewer than 10 images).
-            var smallest = imageEntries.OrderBy(e => e.Length).Take(5);
-            var largest = imageEntries.OrderByDescending(e => e.Length).Take(5);
-            var entriesToCheck = smallest.Concat(largest)
-                .GroupBy(e => e.FullName, StringComparer.OrdinalIgnoreCase)
-                .Select(g => g.First())
-                .ToList();
+            var candidates = OrderCandidatesForSampling(imageEntries);
 
             var issues = new List<UpscaleIssue>();
+            int validAnalyzedCount = 0;
 
-            foreach (var entry in entriesToCheck)
+            foreach (var entry in candidates)
             {
+                if (validAnalyzedCount >= MaxSamplesToAnalyze)
+                    break;
+
                 using var stream = entry.Open();
                 try
                 {
@@ -98,6 +103,8 @@ class UpscaleDetector : IUpscaleDetector
                     if (metrics.Value.EdgeDensity < MinEdgeDensity)
                         continue;
 
+                    validAnalyzedCount++;
+
                     // If the image has substantial noise but also very high Laplacian variance
                     // (many strong edges), treat it as content-rich with compression artifacts
                     // and skip it so it does not trigger an upscale.
@@ -109,8 +116,6 @@ class UpscaleDetector : IUpscaleDetector
                     {
                         var issue = new UpscaleIssue(entry.Name, entry.Length, reasons);
                         issues.Add(issue);
-                        // Continue checking the remaining selected images rather than
-                        // returning immediately so we can report all detected issues.
                     }
                 }
                 catch
@@ -119,7 +124,11 @@ class UpscaleDetector : IUpscaleDetector
                 }
             }
 
-            if (issues.Count > 0)
+            int minIssuesRequired = validAnalyzedCount >= MultiSampleMinValidPages
+                ? MultiSampleMinFailingPages
+                : 1;
+
+            if (issues.Count >= minIssuesRequired)
                 return new UpscaleScanResult(true, issues.ToArray());
 
             return UpscaleScanResult.Clean;
@@ -129,6 +138,53 @@ class UpscaleDetector : IUpscaleDetector
             // If the archive itself cannot be opened, conservatively report no upscale needed.
             return UpscaleScanResult.Clean;
         }
+    }
+
+    private static IReadOnlyList<ZipArchiveEntry> OrderCandidatesForSampling(IReadOnlyList<ZipArchiveEntry> imageEntries)
+    {
+        if (imageEntries.Count <= MaxSamplesToAnalyze)
+            return imageEntries;
+
+        List<ZipArchiveEntry> interior;
+        List<ZipArchiveEntry> boundary;
+
+        if (imageEntries.Count > 6)
+        {
+            boundary = new List<ZipArchiveEntry>(3)
+            {
+                imageEntries[0],
+                imageEntries[^2],
+                imageEntries[^1]
+            };
+            interior = imageEntries.Skip(1).Take(imageEntries.Count - 3).ToList();
+        }
+        else
+        {
+            boundary = [];
+            interior = imageEntries.ToList();
+        }
+
+        var sortedInterior = interior.OrderBy(e => e.Length).ToList();
+        var ordered = new List<ZipArchiveEntry>(imageEntries.Count);
+        var addedIndices = new HashSet<int>();
+
+        double[] percentiles = [0.50, 0.35, 0.65, 0.25, 0.75, 0.15, 0.85, 0.10, 0.90, 0.05];
+        foreach (var p in percentiles)
+        {
+            int idx = Math.Clamp((int)Math.Round(p * (sortedInterior.Count - 1)), 0, sortedInterior.Count - 1);
+            if (addedIndices.Add(idx))
+                ordered.Add(sortedInterior[idx]);
+        }
+
+        int medianIdx = sortedInterior.Count / 2;
+        foreach (int idx in Enumerable.Range(0, sortedInterior.Count).OrderBy(i => Math.Abs(i - medianIdx)))
+        {
+            if (addedIndices.Add(idx))
+                ordered.Add(sortedInterior[idx]);
+        }
+
+        ordered.AddRange(boundary);
+        return ordered;
     }
 
     /// <summary>
@@ -153,6 +209,8 @@ class UpscaleDetector : IUpscaleDetector
 
         if (m.BlurScore < BlurThreshold)
             reasons.Add($"blurry (Laplacian σ² = {m.BlurScore:F1}, threshold {BlurThreshold:F1})");
+        else if (m.SharpEdgeRatio < MinSharpEdgeRatio)
+            reasons.Add($"soft/upscaled edges (sharp edge ratio = {m.SharpEdgeRatio:P0}, min {MinSharpEdgeRatio:P0})");
 
         if (m.NoiseScore > NoiseThreshold)
             reasons.Add($"noisy (Immerkaer σ = {m.NoiseScore:F1}, threshold {NoiseThreshold:F1})");
