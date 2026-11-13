@@ -1,9 +1,11 @@
+using System.Text;
 using Spectre.Console;
 
 class Program
 {
     static int Main(string[] args)
     {
+        ConfigureConsoleEncoding();
         AppVersionHelper.CleanupOldExecutableIfPresent();
 
         bool isInteractiveCandidate = TerminalLauncher.IsInteractiveCandidate(args);
@@ -27,6 +29,22 @@ class Program
         }
 
         return RunCli(args);
+    }
+
+    internal static void ConfigureConsoleEncoding()
+    {
+        try
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+        }
+        catch (IOException)
+        {
+            // Ignore when standard handles are invalid or detached from a console
+        }
+
+        AnsiConsole.Profile.Encoding = Encoding.UTF8;
+        AnsiConsole.Profile.Capabilities.Unicode = true;
     }
 
     private static int RunInteractiveLoop(string[] args)

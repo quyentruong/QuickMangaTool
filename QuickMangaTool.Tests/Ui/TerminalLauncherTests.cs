@@ -1,3 +1,6 @@
+using System.Text;
+using Spectre.Console;
+
 namespace QuickMangaTool.Tests.Ui;
 
 /// <summary>
@@ -420,6 +423,26 @@ public class TerminalLauncherTests : IDisposable
         {
             var resolved = TerminalLauncher.ResolveDefaultWorkingDirectory(homeDir, systemBinExe, homeDir);
             Assert.Equal(homeDir, resolved);
+        }
+    }
+
+    // ── ConfigureConsoleEncoding ──────────────────────────────────────────
+
+    [Fact]
+    public void ConfigureConsoleEncoding_SetsUtf8AndEnablesUnicodeCapabilities()
+    {
+        Program.ConfigureConsoleEncoding();
+
+        Assert.Equal(Encoding.UTF8.CodePage, AnsiConsole.Profile.Encoding.CodePage);
+        Assert.True(AnsiConsole.Profile.Capabilities.Unicode);
+
+        try
+        {
+            Assert.Equal(Encoding.UTF8.CodePage, Console.OutputEncoding.CodePage);
+        }
+        catch (IOException)
+        {
+            // Acceptable when test runner runs without a console handle
         }
     }
 }
