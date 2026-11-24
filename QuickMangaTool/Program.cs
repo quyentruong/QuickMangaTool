@@ -102,7 +102,7 @@ class Program
             return 0;
         }
 
-        if (options.DryRun && options.ConvertImages)
+        if (options.DryRun && (options.ConvertImages || options.RenamePages))
         {
             Console.WriteLine("Dry-run mode: no archives will be modified. Re-run without --dry-run or -n to apply changes.");
         }
@@ -155,7 +155,7 @@ class Program
             return ExecuteWithLogging(command, options, Array.Empty<string>());
         }
 
-        if (options.RemoveOldCbz && !options.ConvertImages)
+        if (options.RemoveOldCbz && !options.ConvertImages && !options.RenamePages)
         {
             var command = new RemoveOldCbzCommand(options.Directory, options.Confirm);
             return ExecuteWithLogging(command, options, Array.Empty<string>());
@@ -181,14 +181,15 @@ class Program
             return ExecuteWithLogging(command, options, cbzFiles);
         }
 
-        if (options.ConvertImages)
+        if (options.ConvertImages || options.RenamePages)
         {
             var archiveProcessor = new ArchiveProcessor(
                 options.DryRun,
                 options.ConvertImages,
                 options.RemoveOldCbz,
                 options.Parallelism,
-                imageConverter);
+                imageConverter,
+                renamePages: options.RenamePages);
 
             var batchProcessor = new BatchProcessor(archiveProcessor, options.Parallelism);
             var command = new BatchTransformCommand(batchProcessor, options.DryRun);
@@ -237,8 +238,9 @@ class Program
         if (options.PdfToCbz) features.Add("PdfToCbz");
         if (options.CbrToCbz) features.Add("CbrToCbz");
         if (options.CompressFolders) features.Add("CompressFolders");
-        if (options.ConvertImages) features.Add($"Convert({options.ImageFormat})" + (options.RemoveOldCbz ? "[RemoveOld]" : string.Empty));
-        if (options.RemoveOldCbz && !options.ConvertImages) features.Add("RemoveOldBackups");
+        if (options.ConvertImages) features.Add($"Convert({options.ImageFormat})" + (options.RemoveOldCbz ? "[RemoveOld]" : string.Empty) + (options.RenamePages ? "[Rename]" : string.Empty));
+        else if (options.RenamePages) features.Add("RenamePages");
+        if (options.RemoveOldCbz && !options.ConvertImages && !options.RenamePages) features.Add("RemoveOldBackups");
         return features.Count > 0 ? string.Join(", ", features) : "BatchProcessing";
     }
 }

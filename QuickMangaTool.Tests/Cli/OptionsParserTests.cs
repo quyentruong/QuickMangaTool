@@ -113,6 +113,35 @@ public class OptionsParserTests
     }
 
     [Fact]
+    public void RenamePages_DefaultsToFalse()
+    {
+        var options = Parse("convert");
+
+        Assert.NotNull(options);
+        Assert.False(options.RenamePages);
+    }
+
+    [Fact]
+    public void RenamePagesFlag_WithConvert_SetsRenamePages()
+    {
+        var options = Parse("convert", "--rename-pages");
+
+        Assert.NotNull(options);
+        Assert.True(options.ConvertImages);
+        Assert.True(options.RenamePages);
+    }
+
+    [Fact]
+    public void RenameAliasFlag_Standalone_SetsRenamePages()
+    {
+        var options = Parse("--rename");
+
+        Assert.NotNull(options);
+        Assert.False(options.ConvertImages);
+        Assert.True(options.RenamePages);
+    }
+
+    [Fact]
     public void InteractiveFlag_Long_SetsInteractive()
     {
         var options = Parse("--interactive");

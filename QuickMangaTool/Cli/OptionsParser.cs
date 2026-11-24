@@ -39,6 +39,7 @@ static class OptionsParser
         var clearCache = args.Contains("--clear-cache") || args.Contains("-c") || args.Contains("clear-cache");
         var updateApp = args.Contains("--update") || args.Contains("update");
         var deleteSource = args.Contains("--delete-source");
+        var renamePages = args.Contains("--rename-pages") || args.Contains("--rename");
 
         int parallelism = 0;
         var pArg = args.FirstOrDefault(a => a.StartsWith("--parallel="));
@@ -76,7 +77,7 @@ static class OptionsParser
 
         bool hasAction = convertImages || compressFolders || pdfToCbz || cbrToCbz ||
                          detectUpscale || removeOldCbz || readLogs || deleteLogs ||
-                         vipsDiagnostics || clearCache || updateApp || interactive;
+                         vipsDiagnostics || clearCache || updateApp || interactive || renamePages;
 
         if (!hasAction)
         {
@@ -105,7 +106,8 @@ static class OptionsParser
             Parallelism: parallelism,
             Effort: effort,
             ClearCache: clearCache,
-            UpdateApp: updateApp);
+            UpdateApp: updateApp,
+            RenamePages: renamePages);
     }
 
     private static void PrintHelp(TextWriter output)
@@ -130,6 +132,7 @@ static class OptionsParser
         output.WriteLine("  -n, --dry-run                     Preview changes without modifying .cbz archives (convert command)");
         output.WriteLine("  -y, --confirm                     Apply deletions or confirm prompts without asking");
         output.WriteLine("  --delete-source                   Delete original file/folder after successful .cbz creation");
+        output.WriteLine("  --rename-pages                    Rename images in .cbz sequentially (001, 002, ...) sorted naturally by number");
         output.WriteLine("  --image-format=webp|avif|jxl      Target image format (default: webp)");
         output.WriteLine("  --effort=N                        Encoder effort level (WebP: 0-6, JXL: 1-9, AVIF: 0-9)");
         output.WriteLine("  --parallel=N                      Number of parallel workers (default: tuned for CPU/IO)");
@@ -139,6 +142,7 @@ static class OptionsParser
         output.WriteLine("  QuickMangaTool                                    Launch interactive menu");
         output.WriteLine("  QuickMangaTool /path/to/manga convert             Convert images to WebP");
         output.WriteLine("  QuickMangaTool /path/to/manga convert --dry-run   Preview WebP conversion size delta");
+        output.WriteLine("  QuickMangaTool /path/to/manga convert --rename-pages");
         output.WriteLine("  QuickMangaTool /path/to/manga convert --image-format=avif --effort=4");
         output.WriteLine("  QuickMangaTool /path/to/manga convert --image-format=jxl --effort=7");
         output.WriteLine("  QuickMangaTool /path/to/folders compress --delete-source");

@@ -164,11 +164,13 @@ static class InteractiveMenu
             bool dryRun = false;
             bool confirm = false;
             bool deleteSource = false;
+            bool renamePages = false;
 
             if (action.StartsWith("1."))
             {
                 convertImages = true;
                 (imageFormat, effort) = PromptFormatAndEffort();
+                renamePages = AnsiConsole.Confirm("Đổi tên ảnh theo số thứ tự (001, 002, ...)?", false);
                 dryRun = AnsiConsole.Confirm("Chạy thử không sửa file (Dry-Run)?", false);
                 removeOldCbz = AnsiConsole.Confirm("Xóa file sao lưu .old.cbz sau khi nén thành công?", false);
             }
@@ -217,7 +219,8 @@ static class InteractiveMenu
                 CbrToCbz: cbrToCbz,
                 Parallelism: 0,
                 Effort: effort,
-                ClearCache: false);
+                ClearCache: false,
+                RenamePages: renamePages);
         }
     }
 

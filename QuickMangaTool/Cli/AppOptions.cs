@@ -25,7 +25,8 @@ record AppOptions(
     int? Effort,
     bool ClearCache,
     bool UpdateApp = false,
-    bool UninstallApp = false)
+    bool UninstallApp = false,
+    bool RenamePages = false)
 {
     public bool ConvertToWebp => ConvertImages;
 }

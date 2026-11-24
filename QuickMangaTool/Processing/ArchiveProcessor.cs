@@ -8,6 +8,7 @@ class ArchiveProcessor : IArchiveProcessor
     private readonly int _parallelism;
     private readonly IArchiveImageConverter _imageConverter;
     private readonly Action<ZipArchive>? _updateHook;
+    private readonly bool _renamePages;
 
     public ArchiveProcessor(
         bool dryRun,
@@ -15,7 +16,8 @@ class ArchiveProcessor : IArchiveProcessor
         bool removeOldCbz,
         int parallelism = 0,
         IArchiveImageConverter? imageConverter = null,
-        Action<ZipArchive>? updateHook = null)
+        Action<ZipArchive>? updateHook = null,
+        bool renamePages = false)
     {
         _dryRun = dryRun;
         _convertImages = convertImages;
@@ -23,6 +25,7 @@ class ArchiveProcessor : IArchiveProcessor
         _parallelism = parallelism;
         _imageConverter = imageConverter ?? new WebpArchiveImageConverter();
         _updateHook = updateHook;
+        _renamePages = renamePages;
     }
 
     public ProcessResult Process(string cbzPath, Action<int, int>? onImageProgress = null)
@@ -31,7 +34,7 @@ class ArchiveProcessor : IArchiveProcessor
         {
             var originalSize = new FileInfo(cbzPath).Length;
 
-            if (!_convertImages)
+            if (!_convertImages && !_renamePages)
                 return new ProcessResult(cbzPath, ProcessStatus.NoChange);
 
             var oldPath = Path.Combine(
@@ -54,9 +57,9 @@ class ArchiveProcessor : IArchiveProcessor
                     Detail: BuildDetail(encodeResult, originalSize, null));
             }
 
-            if (encodeResult.ConvertedKeptCount == 0)
+            if (encodeResult.ConvertedKeptCount == 0 && encodeResult.RenamedCount == 0)
             {
-                // No image became smaller
+                // No image became smaller and no image needs renaming
                 return new ProcessResult(cbzPath, ProcessStatus.NoChange);
             }
 
@@ -80,18 +83,36 @@ class ArchiveProcessor : IArchiveProcessor
                 {
                     _updateHook?.Invoke(zip);
 
-                    for (int i = 0; i < encodeResult.ConvertedEntries.Length; i++)
+                    var planned = encodeResult.PlannedChanges;
+                    var resolvedContents = new byte[planned.Length][];
+
+                    // Pre-read entries that are being renamed without re-encoding before deleting any entries
+                    for (int i = 0; i < planned.Length; i++)
                     {
-                        var (originalName, converted) = encodeResult.ConvertedEntries[i];
-                        if (converted is null || !converted.IsSmaller)
+                        var change = planned[i];
+                        if (change.Content is not null)
+                        {
+                            resolvedContents[i] = change.Content;
                             continue;
+                        }
 
-                        var originalEntry = zip.GetEntry(originalName);
-                        originalEntry?.Delete();
+                        var originalEntry = zip.GetEntry(change.OriginalName)
+                            ?? throw new InvalidDataException($"Entry not found in archive: {change.OriginalName}");
+                        using var s = originalEntry.Open();
+                        resolvedContents[i] = StreamByteReader.Read(s, out _);
+                    }
 
-                        var newEntry = zip.CreateEntry(converted.EntryName, CompressionLevel.Optimal);
+                    // Delete all replaced/renamed entries before creating new ones to prevent name collisions
+                    for (int i = 0; i < planned.Length; i++)
+                    {
+                        zip.GetEntry(planned[i].OriginalName)?.Delete();
+                    }
+
+                    for (int i = 0; i < planned.Length; i++)
+                    {
+                        var newEntry = zip.CreateEntry(planned[i].TargetName, CompressionLevel.Optimal);
                         using var s = newEntry.Open();
-                        s.Write(converted.Content, 0, converted.Content.Length);
+                        s.Write(resolvedContents[i], 0, resolvedContents[i].Length);
                     }
                 }
 
@@ -125,10 +146,13 @@ class ArchiveProcessor : IArchiveProcessor
         }
     }
 
+    private sealed record PlannedEntryChange(string OriginalName, string TargetName, byte[]? Content);
+
     private sealed record EncodeResult(
-        (string OriginalName, ConvertedImage? Converted)[] ConvertedEntries,
+        PlannedEntryChange[] PlannedChanges,
         int ConvertedKeptCount,
         int OriginalKeptCount,
+        int RenamedCount,
         long SourceBytes,
         long ConvertedBytes,
         int FailedImageCount,
@@ -138,54 +162,37 @@ class ArchiveProcessor : IArchiveProcessor
 
     private EncodeResult ReadAndEncodeImages(string cbzPath, Action<int, int>? onImageProgress)
     {
-        List<(string EntryName, byte[] Data)> rawImages;
+        var allImageNames = new List<string>();
+        var rawImages = new List<(string EntryName, byte[] Data)>();
 
         using (var zip = ZipFile.Open(cbzPath, ZipArchiveMode.Read))
         {
-            var candidates = zip.Entries
-                .Where(e => !string.IsNullOrWhiteSpace(e.Name))
-                .Where(e => _imageConverter.CanConvert(e.FullName))
-                .ToList();
-
-            rawImages = new List<(string EntryName, byte[] Data)>(candidates.Count);
-            foreach (var entry in candidates)
+            foreach (var entry in zip.Entries)
             {
-                using var source = entry.Open();
-                using var buffer = new MemoryStream();
-                source.CopyTo(buffer);
-                rawImages.Add((entry.FullName, buffer.ToArray()));
+                if (string.IsNullOrWhiteSpace(entry.Name))
+                    continue;
+
+                bool canConvert = _convertImages && _imageConverter.CanConvert(entry.FullName);
+                bool canRename = _renamePages && ImageExtensions.IsSupportedForAnalysis(entry.FullName);
+                if (!canConvert && !canRename)
+                    continue;
+
+                allImageNames.Add(entry.FullName);
+
+                if (canConvert)
+                {
+                    using var source = entry.Open();
+                    rawImages.Add((entry.FullName, StreamByteReader.Read(source, out _)));
+                }
             }
         }
 
-        if (rawImages.Count == 0)
+        if (allImageNames.Count == 0)
         {
             return new EncodeResult(
-                Array.Empty<(string, ConvertedImage?)>(),
-                0, 0, 0, 0, 0, new List<string>(), 0, 0);
+                Array.Empty<PlannedEntryChange>(),
+                0, 0, 0, 0, 0, 0, new List<string>(), 0, 0);
         }
-
-        int cpuWorkers = WorkerCount.ResolveCpuBound(_parallelism);
-        var converted = new (ConvertedImage? Result, string? Error)[rawImages.Count];
-        int completedCount = 0;
-
-        Parallel.For(0, rawImages.Count, new ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
-        {
-            var (entryName, data) = rawImages[i];
-            try
-            {
-                using var ms = new MemoryStream(data);
-                converted[i] = (_imageConverter.Convert(entryName, ms), null);
-            }
-            catch (Exception ex)
-            {
-                converted[i] = (null, $"{entryName}: {ex.Message}");
-            }
-            finally
-            {
-                var done = Interlocked.Increment(ref completedCount);
-                onImageProgress?.Invoke(done, rawImages.Count);
-            }
-        });
 
         int convertedKeptCount = 0;
         int originalKeptCount = 0;
@@ -196,42 +203,105 @@ class ArchiveProcessor : IArchiveProcessor
         int blackWhiteCount = 0;
         int colorCount = 0;
 
-        var entries = new (string OriginalName, ConvertedImage? Converted)[rawImages.Count];
+        var convertedByOriginalName = new Dictionary<string, ConvertedImage>(StringComparer.Ordinal);
+        var extensionOverrides = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        for (int i = 0; i < converted.Length; i++)
+        if (rawImages.Count > 0)
         {
-            var (result, error) = converted[i];
-            var originalName = rawImages[i].EntryName;
+            int cpuWorkers = WorkerCount.ResolveCpuBound(_parallelism);
+            var converted = new (ConvertedImage? Result, string? Error)[rawImages.Count];
+            int completedCount = 0;
 
-            if (error is not null || result is null)
+            Parallel.For(0, rawImages.Count, new ParallelOptions { MaxDegreeOfParallelism = cpuWorkers }, i =>
             {
-                failedCount++;
-                if (failures.Count < 5)
-                    failures.Add(error ?? $"{originalName}: Unknown error");
-                entries[i] = (originalName, null);
-                continue;
+                var (entryName, data) = rawImages[i];
+                try
+                {
+                    using var ms = new MemoryStream(data);
+                    converted[i] = (_imageConverter.Convert(entryName, ms), null);
+                }
+                catch (Exception ex)
+                {
+                    converted[i] = (null, $"{entryName}: {ex.Message}");
+                }
+                finally
+                {
+                    var done = Interlocked.Increment(ref completedCount);
+                    onImageProgress?.Invoke(done, rawImages.Count);
+                }
+            });
+
+            for (int i = 0; i < converted.Length; i++)
+            {
+                var (result, error) = converted[i];
+                var originalName = rawImages[i].EntryName;
+
+                if (error is not null || result is null)
+                {
+                    failedCount++;
+                    if (failures.Count < 5)
+                        failures.Add(error ?? $"{originalName}: Unknown error");
+                    continue;
+                }
+
+                sourceBytes += result.SourceBytes;
+                convertedBytes += result.ConvertedBytes;
+
+                if (result.IsSmaller)
+                {
+                    convertedKeptCount++;
+                    extensionOverrides[originalName] = Path.GetExtension(result.EntryName).ToLowerInvariant();
+                }
+                else
+                {
+                    originalKeptCount++;
+                }
+
+                if (result.IsBlackAndWhite)
+                    blackWhiteCount++;
+                else
+                    colorCount++;
+
+                convertedByOriginalName[originalName] = result;
             }
+        }
 
-            sourceBytes += result.SourceBytes;
-            convertedBytes += result.ConvertedBytes;
+        var plannedChanges = new List<PlannedEntryChange>();
+        int renamedCount = 0;
 
-            if (result.IsSmaller)
-                convertedKeptCount++;
-            else
-                originalKeptCount++;
+        if (failedCount == 0)
+        {
+            Dictionary<string, string>? renameMap = _renamePages
+                ? PageRenamePlanner.BuildRenameMap(allImageNames, extensionOverrides)
+                : null;
 
-            if (result.IsBlackAndWhite)
-                blackWhiteCount++;
-            else
-                colorCount++;
+            foreach (var originalName in allImageNames)
+            {
+                if (convertedByOriginalName.TryGetValue(originalName, out var result) && result.IsSmaller)
+                {
+                    var targetName = renameMap is not null ? renameMap[originalName] : result.EntryName;
+                    if (_renamePages && !string.Equals(targetName, result.EntryName, StringComparison.Ordinal))
+                        renamedCount++;
 
-            entries[i] = (originalName, result);
+                    plannedChanges.Add(new PlannedEntryChange(originalName, targetName, result.Content));
+                }
+                else if (renameMap is not null)
+                {
+                    var targetName = renameMap[originalName];
+                    if (!string.Equals(targetName, originalName, StringComparison.Ordinal))
+                    {
+                        renamedCount++;
+                        plannedChanges.Add(new PlannedEntryChange(originalName, targetName, Content: null));
+                    }
+                }
+            }
         }
 
         return new EncodeResult(
-            entries,
+            plannedChanges.ToArray(),
             convertedKeptCount,
             originalKeptCount,
+            renamedCount,
             sourceBytes,
             convertedBytes,
             failedCount,
@@ -249,6 +319,13 @@ class ArchiveProcessor : IArchiveProcessor
         {
             lines.Add($"Images processed: {totalProcessed}  (Converted kept: {encodeResult.ConvertedKeptCount}  ·  Original kept (smaller): {encodeResult.OriginalKeptCount})");
             lines.Add($"Black & White: {encodeResult.BlackWhiteCount}  ·  Color: {encodeResult.ColorCount}");
+        }
+
+        if (encodeResult.RenamedCount > 0)
+            lines.Add($"Images renamed: {encodeResult.RenamedCount}");
+
+        if (totalProcessed > 0 || encodeResult.RenamedCount > 0)
+        {
             lines.Add($"Original size:    {SizeFormatter.FormatSize(originalSize)}");
 
             if (newSize is not null)
