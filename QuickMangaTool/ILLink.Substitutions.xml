@@ -93,26 +93,6 @@
     <resource name="UglyToad.PdfPig.Resources.CMap.UniKS-UTF16-V" action="remove" />
     <resource name="UglyToad.PdfPig.Resources.CMap.V" action="remove" />
   </assembly>
-  <assembly fullname="UglyToad.PdfPig.Fonts">
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-Bold.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-BoldOblique.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Courier-Oblique.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-Bold.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-BoldOblique.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Helvetica-Oblique.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.MustRead.html" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Symbol.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Bold.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-BoldItalic.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Italic.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.Times-Roman.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.AdobeFontMetrics.ZapfDingbats.afm" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.additional" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.glyphlist" action="remove" />
-    <resource name="UglyToad.PdfPig.Fonts.Resources.GlyphList.zapfdingbats" action="remove" />
-  </assembly>
   <assembly fullname="SharpCompress">
     <type fullname="SharpCompress.Factories.Factory">
       <method signature="System.Void .cctor()" body="stub" />
